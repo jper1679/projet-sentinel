@@ -44,6 +44,12 @@ class GitHubService:
             return content_file.decoded_content.decode("utf-8")
         except GithubException as e:
             logger.error("Error reading GitHub file", path=path, status=e.status, message=e.data)
+            if e.status in (403, 404):
+                return (
+                    f"Erreur d'accès GitHub ({e.status}) sur le dépôt '{self.repo_name}'. "
+                    f"Le GITHUB_TOKEN n'a pas la permission d'accéder au dépôt '{self.repo_name}'. "
+                    f"Vérifiez que le dépôt est sélectionné dans les autorisations de votre Fine-Grained PAT sur GitHub."
+                )
             return f"Erreur lors de la lecture du fichier '{path}': {e.data.get('message', str(e))}"
         except Exception as e:
             logger.error("Unexpected error reading GitHub file", path=path, error=str(e))
@@ -68,6 +74,13 @@ class GitHubService:
                 if count >= 15:
                     break
             return file_paths if file_paths else [f"Aucun fichier trouvé pour la recherche '{query}'."]
+        except GithubException as e:
+            logger.error("Error searching GitHub repo", query=query, status=e.status, info=str(e))
+            if e.status in (403, 404):
+                return [
+                    f"Erreur d'accès GitHub ({e.status}) : Le GITHUB_TOKEN n'a pas accès au dépôt '{self.repo_name}'."
+                ]
+            return [f"Information recherche : Aucun fichier trouvé pour '{query}'."]
         except Exception as e:
             logger.info("GitHub code search returned result", query=query, info=str(e))
             return [f"Information recherche : Aucun fichier trouvé pour '{query}'."]
