@@ -1,0 +1,80 @@
+// =============================================================================
+// Projet Sentinel — Service Nodes (API CRUD)
+// =============================================================================
+
+import api from './api'
+import type { SentinelNodeData } from '@/store/useAppStore'
+
+export interface NodeCreatePayload {
+  titre: string
+  description?: string
+  type?: string
+  statut?: string
+  priorite?: string
+  temps_estime_h?: number
+  cout_estime?: number
+  pos_x?: number
+  pos_y?: number
+}
+
+export interface NodeUpdatePayload extends Partial<NodeCreatePayload> {}
+
+export interface NodeAPIResponse {
+  id: string
+  titre: string
+  description?: string
+  type: string
+  statut: string
+  priorite: string
+  temps_estime_h?: number
+  cout_estime?: number
+  pos_x: number
+  pos_y: number
+  created_at: string
+  updated_at: string
+}
+
+export const nodeService = {
+  /** Charge tous les nœuds depuis l'API */
+  async getAll(params?: { statut?: string; type?: string }): Promise<NodeAPIResponse[]> {
+    const res = await api.get<NodeAPIResponse[]>('/nodes/', { params })
+    return res.data
+  },
+
+  /** Crée un nouveau nœud */
+  async create(payload: NodeCreatePayload): Promise<NodeAPIResponse> {
+    const res = await api.post<NodeAPIResponse>('/nodes/', payload)
+    return res.data
+  },
+
+  /** Met à jour un nœud (champs + position) */
+  async update(id: string, payload: NodeUpdatePayload): Promise<NodeAPIResponse> {
+    const res = await api.put<NodeAPIResponse>(`/nodes/${id}`, payload)
+    return res.data
+  },
+
+  /** Met à jour uniquement la position (drag React Flow) */
+  async updatePosition(id: string, x: number, y: number): Promise<void> {
+    await api.put(`/nodes/${id}`, { pos_x: x, pos_y: y })
+  },
+
+  /** Supprime un nœud et ses relations */
+  async delete(id: string): Promise<void> {
+    await api.delete(`/nodes/${id}`)
+  },
+}
+
+/** Convertit la réponse API en format React Flow Node data */
+export function apiNodeToFlowData(apiNode: NodeAPIResponse): SentinelNodeData {
+  return {
+    titre: apiNode.titre,
+    description: apiNode.description,
+    type: apiNode.type as SentinelNodeData['type'],
+    statut: apiNode.statut as SentinelNodeData['statut'],
+    priorite: apiNode.priorite as SentinelNodeData['priorite'],
+    temps_estime_h: apiNode.temps_estime_h,
+    cout_estime: apiNode.cout_estime,
+    created_at: apiNode.created_at,
+    updated_at: apiNode.updated_at,
+  }
+}

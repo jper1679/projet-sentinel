@@ -1,0 +1,35 @@
+# ==============================================================================
+# Projet Sentinel — Dépendances Backend Python
+# ==============================================================================
+
+# Framework Web
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Validation & Sérialisation
+pydantic[email]==2.10.3
+pydantic-settings==2.7.0
+
+# Base de données Neo4j
+neo4j==5.27.0
+
+# Authentification JWT
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2   # passlib 1.7.4 incompatible avec bcrypt>=4.0 (ValueError >72 bytes)
+
+# Requêtes HTTP (Brevo SMTP, agents)
+httpx==0.28.1
+
+# Variables d'environnement
+python-dotenv==1.0.1
+
+# Multipart (upload de fichiers futurs)
+python-multipart==0.0.19
+
+# Logging
+structlog==24.4.0
+
+google-genai
+PyGithub
+discord.py

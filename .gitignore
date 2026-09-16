@@ -1,0 +1,47 @@
+# =============================================================================
+# Projet Sentinel — .gitignore
+# =============================================================================
+
+# --- Secrets & configuration locale ---
+.env
+.env.*
+!.env.example
+# nas_config.json contient les credentials NAS !
+nas_config.json
+
+*.pem
+*.key
+scratch/
+
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# --- Node / Frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# --- Docker ---
+*.log
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+*.lnk
+
+# --- IDE ---
+.vscode/settings.json
+.idea/
+*.swp
+*.swo

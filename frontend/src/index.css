@@ -1,0 +1,214 @@
+/* =============================================================================
+   Sentinel — Global CSS (index.css)
+   Dark mode premium avec glassmorphism et animations micro-UI
+   ============================================================================= */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Base ------------------------------------------------------------------ */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: #0a0e1a;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #111827;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e2d45;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2d4a70;
+  }
+}
+
+/* ---- Components ------------------------------------------------------------ */
+@layer components {
+
+  /* Glassmorphism card */
+  .glass-card {
+    @apply bg-sentinel-card/80 backdrop-blur-sm border border-sentinel-border rounded-xl;
+  }
+
+  /* Bouton primaire Sentinel */
+  .btn-primary {
+    @apply flex items-center gap-2 px-4 py-2 rounded-lg
+           bg-sentinel-accent hover:bg-sentinel-accent-hover
+           text-white font-medium text-sm
+           transition-all duration-150 active:scale-95
+           focus:outline-none focus:ring-2 focus:ring-sentinel-accent/50;
+  }
+
+  /* Bouton ghost */
+  .btn-ghost {
+    @apply flex items-center gap-2 px-3 py-2 rounded-lg
+           text-sentinel-text-dim hover:text-sentinel-text hover:bg-sentinel-border
+           text-sm font-medium transition-all duration-150 active:scale-95;
+  }
+
+  /* Input form */
+  .form-input {
+    @apply w-full px-3 py-2 rounded-lg
+           bg-sentinel-surface border border-sentinel-border
+           text-sentinel-text placeholder-sentinel-muted text-sm
+           focus:outline-none focus:border-sentinel-accent focus:ring-1 focus:ring-sentinel-accent/30
+           transition-colors duration-150;
+  }
+
+  /* Label */
+  .form-label {
+    @apply block text-xs font-medium text-sentinel-text-dim mb-1.5 uppercase tracking-wider;
+  }
+
+  /* Badge statut */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-backlog   { @apply badge bg-statut-backlog/20  text-statut-backlog; }
+  .badge-a_faire   { @apply badge bg-statut-a_faire/20  text-statut-a_faire; }
+  .badge-en_cours  { @apply badge bg-statut-en_cours/20 text-statut-en_cours; }
+  .badge-termine   { @apply badge bg-statut-termine/20  text-statut-termine; }
+
+  /* Divider */
+  .divider {
+    @apply w-full h-px bg-sentinel-border my-3;
+  }
+}
+
+/* ---- React Flow custom styles --------------------------------------------- */
+
+/* Fond du canevas */
+.react-flow {
+  background-color: #0a0e1a;
+}
+
+.react-flow__background {
+  background-color: #0a0e1a;
+}
+
+/* Pattern de grille */
+.react-flow__background-pattern {
+  opacity: 0.4;
+}
+
+/* Contrôles React Flow */
+.react-flow__controls {
+  background: #111827;
+  border: 1px solid #1e2d45;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.react-flow__controls-button {
+  background: #111827;
+  border-bottom: 1px solid #1e2d45;
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+}
+
+.react-flow__controls-button:hover {
+  background: #1e2d45;
+  color: #e2e8f0;
+}
+
+/* Minimap */
+.react-flow__minimap {
+  background: #111827;
+  border: 1px solid #1e2d45;
+  border-radius: 10px;
+}
+
+/* Edges / Arêtes */
+.react-flow__edge-path {
+  stroke: #2d4a70;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #60a5fa;
+}
+
+/* Handles de connexion */
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: #2d4a70;
+  border: 2px solid #3b82f6;
+  transition: all 0.15s;
+}
+
+.react-flow__handle:hover {
+  background: #3b82f6;
+  transform: scale(1.3);
+}
+
+/* Sélection multiple */
+.react-flow__selection {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+/* ---- Animations globales --------------------------------------------------- */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #111827 25%,
+    #1a2235 50%,
+    #111827 75%
+  );
+  background-size: 200% auto;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* ---- Transitions de route -------------------------------------------------- */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms, transform 200ms;
+}
