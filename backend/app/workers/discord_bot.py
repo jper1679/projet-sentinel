@@ -12,8 +12,68 @@ from app.config import get_settings
 from app.services.gemini_agent import run_agent_task
 from app.database.connection import get_session
 
+import time
+
 logger = structlog.get_logger()
 settings = get_settings()
+
+# Configuration du Rate Limiter pour l'agent Brad (5 req/min)
+RATE_LIMIT_WINDOW_SECONDS = 60.0
+MAX_REQUESTS_PER_MINUTE = getattr(settings, "discord_rate_limit_rpm", 5)
+
+request_timestamps: list[float] = []
+rate_limit_lock = asyncio.Lock()
+
+
+async def acquire_rate_limit_slot(status_msg: discord.Message | None = None) -> float:
+    """
+    Gestionnaire de débit (Rate Limiter) : garantit que l'agent Brad ne dépasse pas
+    MAX_REQUESTS_PER_MINUTE (par défaut 5 req/min).
+    Si la limite est atteinte, attend le délai nécessaire et informe l'utilisateur sur Discord.
+    """
+    async with rate_limit_lock:
+        now = time.time()
+        # Nettoyer les horodatages datant de plus de 60 secondes
+        while request_timestamps and (now - request_timestamps[0]) >= RATE_LIMIT_WINDOW_SECONDS:
+            request_timestamps.pop(0)
+
+        if len(request_timestamps) >= MAX_REQUESTS_PER_MINUTE:
+            oldest = request_timestamps[0]
+            wait_time = (oldest + RATE_LIMIT_WINDOW_SECONDS) - now + 0.1
+            if wait_time > 0:
+                logger.warning(
+                    "Discord bot rate limit reached",
+                    max_rpm=MAX_REQUESTS_PER_MINUTE,
+                    wait_seconds=round(wait_time, 2)
+                )
+                if status_msg:
+                    try:
+                        seconds_left = max(1, int(wait_time) + 1)
+                        await status_msg.edit(
+                            content=f"⏳ **Limite de débit atteinte ({MAX_REQUESTS_PER_MINUTE} req/min max)** : "
+                                    f"Agent Brad patiente {seconds_left}s avant de traiter votre demande..."
+                        )
+                    except Exception as err:
+                        logger.warning("Could not edit status message for rate limit", error=str(err))
+
+                await asyncio.sleep(wait_time)
+
+                if status_msg:
+                    try:
+                        await status_msg.edit(
+                            content="⚡ **Sentinel Agent** analyse le dépôt GitHub et traite votre demande..."
+                        )
+                    except Exception as err:
+                        logger.warning("Could not restore status message after rate limit delay", error=str(err))
+
+            # Re-nettoyer les timestamps après attente
+            now = time.time()
+            while request_timestamps and (now - request_timestamps[0]) >= RATE_LIMIT_WINDOW_SECONDS:
+                request_timestamps.pop(0)
+
+        request_timestamps.append(now)
+        return now
+
 
 # Configuration des intendants (intents) Discord
 intents = discord.Intents.default()
@@ -77,6 +137,9 @@ async def on_message(message: discord.Message):
             
             # Message de confirmation initial
             status_msg = await message.channel.send("⚡ **Sentinel Agent** analyse le dépôt GitHub et traite votre demande...")
+
+            # Application de la limite de débit de Brad (5 req/min)
+            await acquire_rate_limit_slot(status_msg=status_msg)
 
             try:
                 # Exécution de l'agent Gemini + Outils GitHub

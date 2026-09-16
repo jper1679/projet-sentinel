@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     discord_bot_token: str = ""
     discord_app_id: str = "1549619685060776086"
     discord_public_key: str = "aa2a2f9ad8e4ca87c6db24d4d11ece5a5097b5862e96bc058b0707aa54819b47"
+    discord_rate_limit_rpm: int = 5
 
 
     @property

@@ -53,7 +53,8 @@ Agent autonome de maintenance du dépôt et de documentation automatisée :
 - **Intégration Outils GitHub (`PyGithub`)** : Outils de lecture de fichiers (`read_repo_file`), recherche dans le code (`search_repo`) et proposition de mise à jour documentaire (`propose_doc_update`).
 - **Règles de Sécurité** : Interdiction stricte de pousser directement sur la branche principale (`main`/`master`) ; l'agent crée systématiquement une branche dédiée et ouvre une Pull Request.
 - **Boucle de Tool-Calling Gemini** : Analyse contextuelle multi-tours avec l'IA Gemini (ex. `gemini-2.5-flash`), capable de consulter le dépôt et de rédiger des PRs claires avec justification.
-- **Passerelle Bot Discord (`@SentinelBot`)** : Écouteur sur canaux dédiés ou mentions Discord transmettant les demandes de la communauté/équipe directement à l'agent IA et répondant avec le lien de la PR créée.
+- **Passerelle Bot Discord (`@SentinelBot` / Brad)** : Écouteur sur canaux dédiés ou mentions Discord transmettant les demandes de la communauté/équipe directement à l'agent IA et répondant avec le lien de la PR créée.
+- **Limitation de Débit (Rate Limiting Agent Brad)** : Limitation automatique à 5 requêtes par minute (`DISCORD_RATE_LIMIT_RPM=5`) avec mise en attente fluide et notification visuelle dans Discord pour éviter la saturation de l'API Gemini.
 - **Traçabilité Graphe Neo4j** : Enregistrement de chaque action sous forme de nœud `:AgentAction` lié aux nœuds `:PullRequest` et aux projets (`(:Project)-[:HAS_AUTOMATION]->(:AgentAction)-[:CREATED_PR]->(:PullRequest)`).
 
 ---
