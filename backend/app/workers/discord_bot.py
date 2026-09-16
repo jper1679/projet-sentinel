@@ -34,15 +34,15 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
 
-    # Détecter la mention du bot (@Brad / @SentinelBot) ou commande directe
+    # Détecter la mention du bot, MP, ou commande directe
+    is_dm = isinstance(message.channel, discord.DMChannel)
     bot_mentioned = bot.user in message.mentions if bot.user else False
     is_direct_cmd = (
-        message.content.startswith("!sentinel")
-        or message.content.startswith("!agent")
-        or message.content.startswith("!brad")
+        message.content.startswith("!")
+        or message.content.lower().startswith("brad")
     )
 
-    if bot_mentioned or is_direct_cmd:
+    if bot_mentioned or is_direct_cmd or is_dm:
         prompt = message.content
         # Nettoyer les mentions et préfixes
         if bot.user:
@@ -51,13 +51,21 @@ async def on_message(message: discord.Message):
             prompt.replace("!sentinel", "")
             .replace("!agent", "")
             .replace("!brad", "")
+            .replace("!ping", "ping")
             .strip()
         )
 
+        clean_prompt = prompt.lower().strip()
+
+        # Réponses instantanées pour ping/aide
+        if clean_prompt in ["ping", "pong"]:
+            await message.channel.send("🏓 **Pong !** Agent Brad est en ligne et prêt pour la maintenance du dépôt GitHub.")
+            return
 
         if not prompt:
-            await message.channel.send("👋 Bonjour ! Envoyez-moi une instruction de maintenance ou de documentation (ex: `@SentinelBot Mets à jour le README avec les endpoints agent`).")
+            await message.channel.send("👋 Bonjour ! Envoyez-moi une instruction de maintenance ou de documentation (ex: `@Brad Mets à jour le README avec les endpoints agent`).")
             return
+
 
         async with message.channel.typing():
             logger.info("Discord Bot received task prompt", author=str(message.author), prompt=prompt[:100])
