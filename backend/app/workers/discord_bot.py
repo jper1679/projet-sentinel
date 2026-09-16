@@ -34,16 +34,26 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
 
-    # Détecter la mention du bot (@SentinelBot) ou commande directe
+    # Détecter la mention du bot (@Brad / @SentinelBot) ou commande directe
     bot_mentioned = bot.user in message.mentions if bot.user else False
-    is_direct_cmd = message.content.startswith("!sentinel") or message.content.startswith("!agent")
+    is_direct_cmd = (
+        message.content.startswith("!sentinel")
+        or message.content.startswith("!agent")
+        or message.content.startswith("!brad")
+    )
 
     if bot_mentioned or is_direct_cmd:
         prompt = message.content
-        # Nettoyer les mentions
+        # Nettoyer les mentions et préfixes
         if bot.user:
             prompt = prompt.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "")
-        prompt = prompt.replace("!sentinel", "").replace("!agent", "").strip()
+        prompt = (
+            prompt.replace("!sentinel", "")
+            .replace("!agent", "")
+            .replace("!brad", "")
+            .strip()
+        )
+
 
         if not prompt:
             await message.channel.send("👋 Bonjour ! Envoyez-moi une instruction de maintenance ou de documentation (ex: `@SentinelBot Mets à jour le README avec les endpoints agent`).")

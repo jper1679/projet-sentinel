@@ -54,6 +54,28 @@ services:
       - sentinel_net
 
   # ---------------------------------------------------------------------------
+  # Discord Bot Worker — Agent Brad (Exécution 24/7)
+  # ---------------------------------------------------------------------------
+  discord_bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sentinel_discord_bot
+    restart: unless-stopped
+    command: python -m app.workers.discord_bot
+    env_file:
+      - .env
+    environment:
+      NEO4J_URI: "bolt://neo4j:7687"
+      NEO4J_USER: "neo4j"
+    depends_on:
+      - neo4j
+      - backend
+    networks:
+      - sentinel_net
+
+
+  # ---------------------------------------------------------------------------
   # Frontend — React/Vite buildé, servi par Nginx
   # ---------------------------------------------------------------------------
   frontend:
