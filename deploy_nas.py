@@ -159,8 +159,11 @@ try:
         f"docker rm -f sentinel_neo4j sentinel_backend sentinel_frontend sentinel_nginx 2>/dev/null || true\n"
         f"docker rm -f $(docker ps -a -q --filter 'name=sentinel') 2>/dev/null || true\n"
         f"docker compose down -v --remove-orphans 2>/dev/null || true\n"
+        f"echo '[NAS] Rebuild complet des conteneurs (no-cache)...'\n"
+        f"docker compose build --no-cache\n"
         f"echo '[NAS] Démarrage des conteneurs...'\n"
-        f"docker compose up -d --build --remove-orphans\n"
+        f"docker compose up -d --remove-orphans\n"
+
 
         f"echo '[NAS] Validation des conteneurs en cours d execution :'\n"
         f"docker compose ps\n"
