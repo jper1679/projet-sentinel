@@ -36,7 +36,7 @@ async def run_agent_task(
     project_id: Optional[str] = None,
     custom_github_service: Optional[GitHubService] = None,
 ) -> Dict[str, Any]:
-    """Exécute une tâche d'agent autonome avec Gemini 2.5 Flash et les outils GitHub.
+    """Exécute une tâche d'agent autonome avec Gemini 3.6 Flash et les outils GitHub.
     
     Args:
         prompt: Instruction ou demande de l'utilisateur.
@@ -56,9 +56,11 @@ async def run_agent_task(
 
     # Définition des wrappers d'outils localisés
     def tool_read_repo_file(path: str) -> str:
+        """Fetch content of a file (markdown, code) from the target repository."""
         return gh_service.read_repo_file(path)
 
     def tool_search_repo(query: str) -> List[str]:
+        """Search relevant files in the repository codebase."""
         return gh_service.search_repo(query)
 
     def tool_propose_doc_update(
@@ -69,6 +71,7 @@ async def run_agent_task(
         pr_title: str,
         pr_description: str,
     ) -> str:
+        """Creates a new branch from main, commits modified content, and opens a Pull Request."""
         return gh_service.propose_doc_update(
             file_path=file_path,
             new_content=new_content,
@@ -79,108 +82,66 @@ async def run_agent_task(
         )
 
     tools_list = [tool_read_repo_file, tool_search_repo, tool_propose_doc_update]
-    tool_map = {
-        "tool_read_repo_file": tool_read_repo_file,
-        "read_repo_file": tool_read_repo_file,
-        "tool_search_repo": tool_search_repo,
-        "search_repo": tool_search_repo,
-        "tool_propose_doc_update": tool_propose_doc_update,
-        "propose_doc_update": tool_propose_doc_update,
-    }
 
     pr_urls: List[str] = []
     action_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
+    final_text = ""
 
     try:
         from google import genai
         from google.genai import types
 
         client = genai.Client(api_key=api_key)
+        model_candidates = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash-exp", "gemini-flash-latest"]
 
-        model_candidates = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
-
-        contents = [prompt]
-        max_turns = 8
-        turn = 0
-        final_text = ""
+        response = None
+        last_err = None
 
         logger.info("Starting Gemini agent task", prompt=prompt[:100])
 
-        while turn < max_turns:
-            turn += 1
-            response = None
-            last_err = None
-
-            for m in model_candidates:
-                try:
-                    response = client.models.generate_content(
-                        model=m,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_INSTRUCTION,
-                            tools=tools_list,
-                            temperature=0.2,
-                        ),
-                    )
-                    if response:
-                        break
-                except Exception as m_err:
-                    logger.warning("Gemini model candidate failed, trying next", model=m, error=str(m_err))
-                    last_err = m_err
-                    continue
-
-            if not response:
-                raise RuntimeError(f"Aucun modèle Gemini n'a pu exécuter la demande : {str(last_err)}")
+        for m in model_candidates:
+            try:
+                logger.info("Calling Gemini model candidate", model=m)
+                response = client.models.generate_content(
+                    model=m,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        tools=tools_list,
+                        temperature=0.2,
+                    ),
+                )
+                if response:
+                    break
+            except Exception as m_err:
+                err_str = str(m_err)
+                logger.warning("Gemini model candidate failed, trying next", model=m, error=err_str)
+                last_err = m_err
+                if "RESOURCE_EXHAUSTED" in err_str or "429" in err_str:
+                    import time
+                    time.sleep(2)
+                continue
 
 
-            # Vérifier si Gemini demande des appels de fonction
-            function_calls = getattr(response, "function_calls", None)
-            if not function_calls and hasattr(response, "candidates") and response.candidates:
-                candidate = response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    for part in candidate.content.parts:
-                        if hasattr(part, "function_call") and part.function_call:
-                            function_calls = [part.function_call]
-                            break
+        if not response:
+            raise RuntimeError(f"Aucun modèle Gemini n'a pu exécuter la demande : {str(last_err)}")
 
-            if function_calls:
-                # Conserver le message de réponse de l'assistant dans la conversation
-                if hasattr(response, "candidates") and response.candidates:
-                    contents.append(response.candidates[0].content)
+        if hasattr(response, "text") and response.text:
+            final_text = response.text
 
-                for fc in function_calls:
-                    fn_name = fc.name
-                    fn_args = dict(fc.args) if fc.args else {}
-                    logger.info("Gemini requested tool execution", tool=fn_name, args=fn_args)
-
-                    if fn_name in tool_map:
-                        tool_fn = tool_map[fn_name]
-                        result = tool_fn(**fn_args)
-                    else:
-                        result = f"Erreur : Outil '{fn_name}' non reconnu."
-
-                    result_str = str(result)
-                    logger.info("Tool execution result", tool=fn_name, result_preview=result_str[:200])
-
-                    # Extraire d'éventuelles URLs de PR créées
-                    urls = re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", result_str)
-                    for url in urls:
-                        if url not in pr_urls:
-                            pr_urls.append(url)
-
-                    # Transmettre la réponse de l'outil à Gemini
-                    contents.append(
-                        types.Part.from_function_response(
-                            name=fn_name,
-                            response={"result": result_str},
-                        )
-                    )
-            else:
-                # Pas d'appel de fonction, fin de l'itération
-                if hasattr(response, "text") and response.text:
-                    final_text = response.text
-                break
+        # Extraire d'éventuelles URLs de PR depuis l'historique d'exécution automatique des fonctions
+        func_history = getattr(response, "automatic_function_calling_history", [])
+        for content in func_history:
+            if hasattr(content, "parts"):
+                for part in content.parts:
+                    fn_resp = getattr(part, "function_response", None)
+                    if fn_resp and hasattr(fn_resp, "response"):
+                        res_str = str(fn_resp.response)
+                        urls = re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", res_str)
+                        for url in urls:
+                            if url not in pr_urls:
+                                pr_urls.append(url)
 
         if not final_text and pr_urls:
             final_text = f"Tâche exécutée avec succès. Pull Request(s) générée(s) : {', '.join(pr_urls)}"

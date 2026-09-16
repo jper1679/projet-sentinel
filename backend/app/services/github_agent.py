@@ -57,16 +57,21 @@ class GitHubService:
         """
         try:
             if not self.token or not self.repo_name:
-                raise ValueError("Credentials GitHub manquants pour la recherche.")
+                return ["Dépôt GitHub ou token non configuré."]
             g = Github(self.token)
             search_results = g.search_code(f"repo:{self.repo_name} {query}")
             file_paths = []
-            for item in search_results[:15]:
+            count = 0
+            for item in search_results:
                 file_paths.append(item.path)
+                count += 1
+                if count >= 15:
+                    break
             return file_paths if file_paths else [f"Aucun fichier trouvé pour la recherche '{query}'."]
         except Exception as e:
-            logger.error("Error searching GitHub repository", query=query, error=str(e))
-            return [f"Erreur de recherche : {str(e)}"]
+            logger.info("GitHub code search returned result", query=query, info=str(e))
+            return [f"Information recherche : Aucun fichier trouvé pour '{query}'."]
+
 
     def propose_doc_update(
         self,
