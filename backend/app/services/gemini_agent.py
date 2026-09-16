@@ -98,32 +98,41 @@ async def run_agent_task(
 
         client = genai.Client(api_key=api_key)
 
-        model_candidates = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
-        selected_model = None
-
-        # Tester la liste de modèles Gemini
-        for m in model_candidates:
-            selected_model = m
-            break
+        model_candidates = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
 
         contents = [prompt]
         max_turns = 8
         turn = 0
         final_text = ""
 
-        logger.info("Starting Gemini agent task", prompt=prompt[:100], model=selected_model)
+        logger.info("Starting Gemini agent task", prompt=prompt[:100])
 
         while turn < max_turns:
             turn += 1
-            response = client.models.generate_content(
-                model=selected_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    tools=tools_list,
-                    temperature=0.2,
-                ),
-            )
+            response = None
+            last_err = None
+
+            for m in model_candidates:
+                try:
+                    response = client.models.generate_content(
+                        model=m,
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_INSTRUCTION,
+                            tools=tools_list,
+                            temperature=0.2,
+                        ),
+                    )
+                    if response:
+                        break
+                except Exception as m_err:
+                    logger.warning("Gemini model candidate failed, trying next", model=m, error=str(m_err))
+                    last_err = m_err
+                    continue
+
+            if not response:
+                raise RuntimeError(f"Aucun modèle Gemini n'a pu exécuter la demande : {str(last_err)}")
+
 
             # Vérifier si Gemini demande des appels de fonction
             function_calls = getattr(response, "function_calls", None)
