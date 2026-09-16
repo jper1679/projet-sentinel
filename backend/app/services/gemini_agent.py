@@ -93,7 +93,13 @@ async def run_agent_task(
         from google.genai import types
 
         client = genai.Client(api_key=api_key)
-        model_candidates = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.0-flash-exp", "gemini-flash-latest"]
+        model_candidates = [
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+        ]
+
 
         response = None
         last_err = None
