@@ -34,6 +34,9 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
 
+    logger.info("Received Discord message", author=str(message.author), content=repr(message.content), channel=str(message.channel))
+
+
     # Détecter la mention du bot, MP, ou commande directe
     is_dm = isinstance(message.channel, discord.DMChannel)
     bot_mentioned = bot.user in message.mentions if bot.user else False
