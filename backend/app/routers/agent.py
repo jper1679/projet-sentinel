@@ -106,7 +106,8 @@ async def parse_scratchpad(
         client = genai.Client(api_key=api_key)
         
         response = None
-        for model_name in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]:
+        for model_name in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
+
             try:
                 logger.info("Calling Gemini model for procedure parse", model=model_name)
                 response = client.models.generate_content(

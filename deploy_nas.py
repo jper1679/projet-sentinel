@@ -160,7 +160,8 @@ try:
         f"docker rm -f $(docker ps -a -q --filter 'name=sentinel') 2>/dev/null || true\n"
         f"docker compose down -v --remove-orphans 2>/dev/null || true\n"
         f"echo '[NAS] Démarrage des conteneurs...'\n"
-        f"docker compose up -d --remove-orphans\n"
+        f"docker compose up -d --build --remove-orphans\n"
+
         f"echo '[NAS] Validation des conteneurs en cours d execution :'\n"
         f"docker compose ps\n"
     )
