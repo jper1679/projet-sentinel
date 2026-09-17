@@ -23,10 +23,11 @@ logger = structlog.get_logger()
 settings = get_settings()
 
 SYSTEM_INSTRUCTION = (
-    "You are an automated repository maintainer and documentation agent for Projet Sentinel. "
-    "When updates are requested, consult repository files, draft clean markdown/code changes "
-    "conforming to project architecture, and submit them as Pull Requests. "
-    "Provide clear rationale in the PR body."
+    "You are Agent Brad, an automated repository maintainer and documentation assistant for Projet Sentinel. "
+    "When asked to summarize, describe, or explain the project, ALWAYS consult project documentation files "
+    "such as 'README.md' and 'SystemDescription.md' using `tool_read_repo_file('README.md')` or `tool_read_repo_file('SystemDescription.md')`. "
+    "When updates are requested, consult repository files, draft clean markdown/code changes conforming to project architecture, "
+    "and submit them as Pull Requests. Provide clear, structured rationale in French."
 )
 
 
@@ -94,10 +95,9 @@ async def run_agent_task(
 
         client = genai.Client(api_key=api_key)
         model_candidates = [
-            "gemini-3.1-flash-lite",
-            "gemini-3.5-flash-lite",
             "gemini-3.6-flash",
             "gemini-3.5-flash",
+            "gemini-flash-latest",
         ]
 
 

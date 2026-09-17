@@ -34,13 +34,29 @@ class GitHubService:
         Args:
             path: Relative filepath in the repository (e.g., 'README.md', 'docs/architecture.md').
         """
+        clean_path = (path or "").strip().lstrip("/")
         try:
             repo = self._get_repo()
-            content_file = repo.get_contents(path)
+            content_file = repo.get_contents(clean_path)
             if isinstance(content_file, list):
-                # Directory listed instead of single file
+                # Le chemin est un répertoire : lister les fichiers et inclure les docs principales s'il s'agit de la racine
                 files = [f.path for f in content_file]
-                return f"Le chemin est un dossier contenant : {', '.join(files)}"
+                result_text = f"Le chemin est un dossier contenant ({len(files)} éléments) : {', '.join(files)}"
+                
+                # Si exploration de la racine, ajouter automatiquement les docs principales
+                if not clean_path or clean_path in [".", "root"]:
+                    docs_found = []
+                    for doc_name in ["README.md", "SystemDescription.md"]:
+                        try:
+                            df = repo.get_contents(doc_name)
+                            if not isinstance(df, list):
+                                docs_found.append(f"\n\n--- CONTENU DE {doc_name} ---\n{df.decoded_content.decode('utf-8')[:4000]}")
+                        except Exception:
+                            pass
+                    if docs_found:
+                        result_text += "".join(docs_found)
+                return result_text
+
             return content_file.decoded_content.decode("utf-8")
         except GithubException as e:
             logger.error("Error reading GitHub file", path=path, status=e.status, message=e.data)
@@ -61,11 +77,24 @@ class GitHubService:
         Args:
             query: Search string or keywords to find in code/docs.
         """
+        clean_query = (query or "").strip().lower()
         try:
             if not self.token or not self.repo_name:
                 return ["Dépôt GitHub ou token non configuré."]
+            
+            # Recherche générique ou vide : retourner une sélection de fichiers clés du projet
+            if not clean_query or clean_query in ["*", "all", "projet", "project", "sentinel", "files", "fichiers", "readme"]:
+                return [
+                    "README.md",
+                    "SystemDescription.md",
+                    "docker-compose.yml",
+                    "backend/app/main.py",
+                    "backend/app/services/gemini_agent.py",
+                    "frontend/src/App.tsx"
+                ]
+
             g = Github(self.token)
-            search_results = g.search_code(f"repo:{self.repo_name} {query}")
+            search_results = g.search_code(f"repo:{self.repo_name} {clean_query}")
             file_paths = []
             count = 0
             for item in search_results:
@@ -73,17 +102,21 @@ class GitHubService:
                 count += 1
                 if count >= 15:
                     break
-            return file_paths if file_paths else [f"Aucun fichier trouvé pour la recherche '{query}'."]
+            return file_paths if file_paths else [
+                "README.md",
+                "SystemDescription.md",
+                "docker-compose.yml"
+            ]
         except GithubException as e:
             logger.error("Error searching GitHub repo", query=query, status=e.status, info=str(e))
             if e.status in (403, 404):
                 return [
                     f"Erreur d'accès GitHub ({e.status}) : Le GITHUB_TOKEN n'a pas accès au dépôt '{self.repo_name}'."
                 ]
-            return [f"Information recherche : Aucun fichier trouvé pour '{query}'."]
+            return ["README.md", "SystemDescription.md", "docker-compose.yml"]
         except Exception as e:
             logger.info("GitHub code search returned result", query=query, info=str(e))
-            return [f"Information recherche : Aucun fichier trouvé pour '{query}'."]
+            return ["README.md", "SystemDescription.md", "docker-compose.yml"]
 
 
     def propose_doc_update(
