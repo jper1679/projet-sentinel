@@ -274,7 +274,7 @@ async def import_xmind(
         l["created_at"] = now
 
     # Bulk create nodes in Neo4j
-    await session.run(
+    res_nodes = await session.run(
         """
         UNWIND $nodes AS row
         MERGE (i:Item {id: row.id})
@@ -287,13 +287,15 @@ async def import_xmind(
             i.pos_y = row.pos_y,
             i.created_at = row.created_at,
             i.updated_at = row.updated_at
+        RETURN count(i) AS cnt
         """,
         {"nodes": nodes_data},
     )
+    await res_nodes.consume()
 
     # Bulk create links in Neo4j
     if links_data:
-        await session.run(
+        res_links = await session.run(
             """
             UNWIND $links AS row
             MATCH (a:Item {id: row.source_id})
@@ -301,9 +303,11 @@ async def import_xmind(
             MERGE (a)-[r:REL {id: row.id}]->(b)
             SET r.type = row.type,
                 r.created_at = row.created_at
+            RETURN count(r) AS cnt
             """,
             {"links": links_data},
         )
+        await res_links.consume()
 
     return {
         "status": "success",

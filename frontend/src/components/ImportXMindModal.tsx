@@ -223,7 +223,10 @@ export default function ImportXMindModal({
 
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => {
+                    onSuccess()
+                    onClose()
+                  }}
                   className="w-full py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-[#1e2d45] transition-colors"
                 >
                   Fermer et afficher le canevas
