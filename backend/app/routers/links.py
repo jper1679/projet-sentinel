@@ -63,10 +63,10 @@ async def list_links(
         MATCH (s:Item)-[r]->(t:Item)
         WHERE type(r) IN [
             'EXECUTE_AVANT', 'BLOQUEE_PAR', 'RATTACHE_A',
-            'ASSIGNE_A', 'SUIVIE_DE', 'CONTIENT_ETAPE', 'LIE_A'
+            'ASSIGNE_A', 'SUIVIE_DE', 'CONTIENT_ETAPE', 'LIE_A', 'REL'
         ]
         RETURN r.id AS id, s.id AS source_id, t.id AS target_id,
-               type(r) AS type, r.created_at AS created_at
+               COALESCE(r.type, type(r)) AS type, r.created_at AS created_at
         ORDER BY r.created_at DESC
         """,
     )
@@ -173,14 +173,19 @@ async def delete_link(
     _user: CurrentUser,
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    result = await session.run(
-        """
-        MATCH ()-[r {id: $id}]->()
-        DELETE r
-        RETURN count(r) AS deleted
-        """,
-        {"id": link_id},
-    )
-    record = await result.single()
-    if not record or record["deleted"] == 0:
+    async def _do_delete(tx):
+        res = await tx.run(
+            """
+            MATCH ()-[r {id: $id}]->()
+            DELETE r
+            RETURN count(r) AS deleted
+            """,
+            {"id": link_id},
+        )
+        rec = await res.single()
+        await res.consume()
+        return rec["deleted"] if rec else 0
+
+    deleted = await session.execute_write(_do_delete)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Relation introuvable")

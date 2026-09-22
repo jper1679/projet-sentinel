@@ -262,12 +262,17 @@ async def delete_node(
     _user: UserOrAdmin,
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    result = await session.run(
-        "MATCH (i:Item {id: $id}) DETACH DELETE i RETURN count(i) AS deleted",
-        {"id": node_id},
-    )
-    record = await result.single()
-    if not record or record["deleted"] == 0:
+    async def _do_delete(tx):
+        res = await tx.run(
+            "MATCH (i:Item {id: $id}) DETACH DELETE i RETURN count(i) AS deleted",
+            {"id": node_id},
+        )
+        rec = await res.single()
+        await res.consume()
+        return rec["deleted"] if rec else 0
+
+    deleted = await session.execute_write(_do_delete)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Nœud introuvable")
 
 
@@ -297,7 +302,20 @@ async def import_xmind(
     for l in links_data:
         l["created_at"] = now
 
+    valid_rel_types = {
+        "EXECUTE_AVANT", "BLOQUEE_PAR", "RATTACHE_A",
+        "ASSIGNE_A", "SUIVIE_DE", "CONTIENT_ETAPE", "LIE_A"
+    }
+
+    # Grouper les relations par type pour générer les labels Cypher exacts
+    links_by_type: dict[str, list[dict]] = {}
+    for l in links_data:
+        raw_t = str(l.get("type") or "CONTIENT_ETAPE").upper().strip()
+        t = raw_t if raw_t in valid_rel_types else "CONTIENT_ETAPE"
+        links_by_type.setdefault(t, []).append(l)
+
     async def _write_xmind_data(tx):
+        # 1. Nœuds
         res_n = await tx.run(
             """
             UNWIND $nodes AS row
@@ -317,19 +335,18 @@ async def import_xmind(
         )
         await res_n.consume()
 
-        if links_data:
-            res_l = await tx.run(
-                """
-                UNWIND $links AS row
-                MATCH (a:Item {id: row.source_id})
-                MATCH (b:Item {id: row.target_id})
-                MERGE (a)-[r:REL {id: row.id}]->(b)
-                SET r.type = row.type,
-                    r.created_at = row.created_at
-                RETURN count(r) AS cnt
-                """,
-                {"links": links_data},
-            )
+        # 2. Relations (avec types de liens exacts dans Neo4j)
+        for rel_type, rel_list in links_by_type.items():
+            cypher_link = f"""
+            UNWIND $links AS row
+            MATCH (a:Item {{id: row.source_id}})
+            MATCH (b:Item {{id: row.target_id}})
+            MERGE (a)-[r:{rel_type} {{id: row.id}}]->(b)
+            SET r.type = '{rel_type}',
+                r.created_at = row.created_at
+            RETURN count(r) AS cnt
+            """
+            res_l = await tx.run(cypher_link, {"links": rel_list})
             await res_l.consume()
 
     await session.execute_write(_write_xmind_data)

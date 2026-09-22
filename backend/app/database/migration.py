@@ -67,7 +67,18 @@ async def run_migrations(driver: AsyncDriver) -> None:
             now=now,
         )
 
-        # 3. Compter le total des nœuds et des relations pour les logs
+        # 3. Migrer les anciennes relations génériques :REL vers :CONTIENT_ETAPE
+        await session.run(
+            """
+            MATCH (a:Item)-[r:REL]->(b:Item)
+            MERGE (a)-[r2:CONTIENT_ETAPE {id: r.id}]->(b)
+            SET r2.type = 'CONTIENT_ETAPE', r2.created_at = COALESCE(r.created_at, $now)
+            DELETE r
+            """,
+            now=now,
+        )
+
+        # 4. Compter le total des nœuds et des relations pour les logs
         result = await session.run(
             """
             MATCH (n)
