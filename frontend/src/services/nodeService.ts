@@ -68,6 +68,18 @@ export const nodeService = {
   async delete(id: string): Promise<void> {
     await api.delete(`/nodes/${id}`)
   },
+
+  /** Importe un fichier .xmind ou .json */
+  async importXMind(file: File): Promise<{ created_nodes: number; created_links: number; message: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post<{ created_nodes: number; created_links: number; message: string }>(
+      '/nodes/import/xmind',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return res.data
+  },
 }
 
 /** Convertit la réponse API en format React Flow Node data */

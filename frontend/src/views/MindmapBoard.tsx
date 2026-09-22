@@ -30,6 +30,7 @@ import CustomMindmapNode from '@/components/CustomMindmapNode'
 import NodeDetailDrawer from '@/components/NodeDetailDrawer'
 import CreateLinkModal from '@/components/CreateLinkModal'
 import ScratchpadModal from '@/components/ScratchpadModal'
+import ImportXMindModal from '@/components/ImportXMindModal'
 import Toolbar from '@/components/Toolbar'
 
 // Types de nœuds enregistrés
@@ -64,6 +65,7 @@ function MindmapBoardContent() {
   // Modales
   const [isCreateLinkOpen, setIsCreateLinkOpen] = useState(false)
   const [isScratchpadOpen, setIsScratchpadOpen] = useState(false)
+  const [isImportXMindOpen, setIsImportXMindOpen] = useState(false)
 
   // -------------------------------------------------------------------------
   // Chargement initial du graphe
@@ -353,6 +355,7 @@ function MindmapBoardContent() {
             onAddLink={() => setIsCreateLinkOpen(true)}
             onAutoLayout={handleAutoLayout}
             onOpenScratchpad={() => setIsScratchpadOpen(true)}
+            onOpenImportXMind={() => setIsImportXMindOpen(true)}
             isLoading={isLoading}
             nodeCount={rfNodes.length}
             edgeCount={rfEdges.length}
@@ -394,6 +397,19 @@ function MindmapBoardContent() {
         onApplied={async () => {
           await loadGraph()
           setTimeout(() => fitView({ duration: 500, padding: 0.2 }), 100)
+        }}
+      />
+
+      {/* Modale Importation XMind */}
+      <ImportXMindModal
+        isOpen={isImportXMindOpen}
+        onClose={() => setIsImportXMindOpen(false)}
+        onSuccess={async () => {
+          await loadGraph()
+          setTimeout(() => fitView({ duration: 500, padding: 0.2 }), 100)
+        }}
+        onTriggerAutoLayout={() => {
+          handleAutoLayout('LR')
         }}
       />
 

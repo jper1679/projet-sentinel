@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Network, LogOut, RefreshCw, ZoomIn, ZoomOut,
   Maximize, Info, Plus, Link2, LayoutGrid, ChevronDown, Sparkles, Eye, Check, BarChart2,
-  CheckSquare, Layers, Download
+  CheckSquare, Layers, Download, FileSpreadsheet
 } from 'lucide-react'
 import { useReactFlow } from '@xyflow/react'
 import { useAppStore, type NodeVisibleFields } from '@/store/useAppStore'
@@ -15,6 +15,7 @@ interface ToolbarProps {
   onAddLink: () => void
   onAutoLayout: (direction: LayoutDirection) => void
   onOpenScratchpad: () => void
+  onOpenImportXMind?: () => void
   isLoading: boolean
   nodeCount: number
   edgeCount: number
@@ -26,6 +27,7 @@ export default function Toolbar({
   onAddLink,
   onAutoLayout,
   onOpenScratchpad,
+  onOpenImportXMind,
   isLoading,
   nodeCount,
   edgeCount,
@@ -209,6 +211,18 @@ export default function Toolbar({
             <Link2 size={14} className="text-sentinel-accent" /> Lien
           </button>
         </div>
+
+        {/* Bouton Importation XMind */}
+        {onOpenImportXMind && (
+          <button
+            id="btn-import-xmind"
+            onClick={onOpenImportXMind}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 transition-all shadow-sm cursor-pointer"
+            title="Importer une carte Mindmap XMind (.xmind)"
+          >
+            <FileSpreadsheet size={13} className="text-cyan-400" /> Importer XMind 📥
+          </button>
+        )}
 
         {/* Bouton Auto-Arranger avec menu déroulant */}
         <div className="relative z-20">

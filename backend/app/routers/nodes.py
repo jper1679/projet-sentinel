@@ -7,13 +7,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from neo4j import AsyncSession
 
 from app.auth.dependencies import CurrentUser, UserOrAdmin
 from app.database.connection import get_session
 from app.database.queries import run_query, run_single
 from app.models.item import NodeCreate, NodeOut, NodeUpdate
+from app.services.xmind_parser import parse_xmind_bytes
 
 router = APIRouter()
 
@@ -244,3 +245,70 @@ async def delete_node(
     record = await result.single()
     if not record or record["deleted"] == 0:
         raise HTTPException(status_code=404, detail="Nœud introuvable")
+
+
+# ------------------------------------------------------------------------------
+# POST /api/nodes/import/xmind — Importer un fichier XMind (.xmind)
+# ------------------------------------------------------------------------------
+@router.post("/import/xmind", summary="Importer un fichier XMind (.xmind)")
+async def import_xmind(
+    _user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    file: UploadFile = File(...),
+):
+    try:
+        contents = await file.read()
+        nodes_data, links_data = parse_xmind_bytes(contents)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Fichier XMind invalide : {str(e)}")
+
+    if not nodes_data:
+        raise HTTPException(status_code=422, detail="Aucun sujet/nœud trouvé dans le fichier XMind.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    for n in nodes_data:
+        n["created_at"] = now
+        n["updated_at"] = now
+
+    for l in links_data:
+        l["created_at"] = now
+
+    # Bulk create nodes in Neo4j
+    await session.run(
+        """
+        UNWIND $nodes AS row
+        MERGE (i:Item {id: row.id})
+        SET i.titre = row.titre,
+            i.description = row.description,
+            i.type = row.type,
+            i.statut = row.statut,
+            i.priorite = row.priorite,
+            i.pos_x = row.pos_x,
+            i.pos_y = row.pos_y,
+            i.created_at = row.created_at,
+            i.updated_at = row.updated_at
+        """,
+        {"nodes": nodes_data},
+    )
+
+    # Bulk create links in Neo4j
+    if links_data:
+        await session.run(
+            """
+            UNWIND $links AS row
+            MATCH (a:Item {id: row.source_id})
+            MATCH (b:Item {id: row.target_id})
+            MERGE (a)-[r:REL {id: row.id}]->(b)
+            SET r.type = row.type,
+                r.created_at = row.created_at
+            """,
+            {"links": links_data},
+        )
+
+    return {
+        "status": "success",
+        "created_nodes": len(nodes_data),
+        "created_links": len(links_data),
+        "message": f"{len(nodes_data)} nœuds et {len(links_data)} relations créés avec succès.",
+    }
+
