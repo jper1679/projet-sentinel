@@ -122,6 +122,23 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
               >
                 {data.type}
               </span>
+              {Boolean(data.group_id) && (
+                <span
+                  title="Ce nœud appartient à un bloc solidaire"
+                  style={{
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    color: '#818cf8',
+                    background: 'rgba(99,102,241,0.2)',
+                    border: '1px solid rgba(99,102,241,0.4)',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    marginLeft: '4px',
+                  }}
+                >
+                  📦 BLOC
+                </span>
+              )}
             </>
           )}
         </div>

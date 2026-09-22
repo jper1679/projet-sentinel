@@ -43,6 +43,7 @@ class NodeCreate(BaseModel):
     # Position sur le canevas Mindmap
     pos_x: float = 0.0
     pos_y: float = 0.0
+    group_id: Optional[str] = None
 
 
 class NodeUpdate(BaseModel):
@@ -55,6 +56,7 @@ class NodeUpdate(BaseModel):
     cout_estime: Optional[float] = Field(None, ge=0)
     pos_x: Optional[float] = None
     pos_y: Optional[float] = None
+    group_id: Optional[str] = None
 
 
 class NodeOut(BaseModel):
@@ -68,6 +70,7 @@ class NodeOut(BaseModel):
     cout_estime: Optional[float] = None
     pos_x: float = 0.0
     pos_y: float = 0.0
+    group_id: Optional[str] = None
     created_at: str
     updated_at: str
 

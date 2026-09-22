@@ -69,6 +69,9 @@ def _row_to_node(row: dict) -> NodeOut:
     except (ValueError, TypeError):
         cout_estime = None
 
+    raw_group_id = n.get("group_id")
+    group_id = str(raw_group_id) if raw_group_id else None
+
     return NodeOut(
         id=str(n.get("id") or uuid.uuid4()),
         titre=str(n.get("titre") or "Sans titre"),
@@ -80,6 +83,7 @@ def _row_to_node(row: dict) -> NodeOut:
         cout_estime=cout_estime,
         pos_x=pos_x,
         pos_y=pos_y,
+        group_id=group_id,
         created_at=str(n.get("created_at") or now),
         updated_at=str(n.get("updated_at") or now),
     )
@@ -112,7 +116,7 @@ async def list_nodes(
         {where}
         RETURN i {{
             .id, .titre, .description, .type, .statut, .priorite,
-            .temps_estime_h, .cout_estime, .pos_x, .pos_y,
+            .temps_estime_h, .cout_estime, .pos_x, .pos_y, .group_id,
             .created_at, .updated_at
         }} AS n
         ORDER BY i.created_at DESC
@@ -238,7 +242,7 @@ async def update_node(
         SET {set_clause}
         RETURN i {{
             .id, .titre, .description, .type, .statut, .priorite,
-            .temps_estime_h, .cout_estime, .pos_x, .pos_y,
+            .temps_estime_h, .cout_estime, .pos_x, .pos_y, .group_id,
             .created_at, .updated_at
         }} AS n
         """,
@@ -247,6 +251,39 @@ async def update_node(
     if not record:
         raise HTTPException(status_code=404, detail="Nœud introuvable")
     return _row_to_node(record)
+
+
+class BulkGroupRequest(BaseModel):
+    node_ids: list[str]
+    group_id: str | None = None
+
+
+# ------------------------------------------------------------------------------
+# PUT /api/nodes/group_bulk — Grouper / Dégrouper plusieurs nœuds
+# ------------------------------------------------------------------------------
+@router.put("/group_bulk", summary="Attribuer ou dissoudre un groupe en lot")
+async def bulk_group_nodes(
+    body: BulkGroupRequest,
+    _user: CurrentUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    now = datetime.now(timezone.utc).isoformat()
+    async def _do_bulk_group(tx):
+        res = await tx.run(
+            """
+            UNWIND $node_ids AS node_id
+            MATCH (i:Item {id: node_id})
+            SET i.group_id = $group_id, i.updated_at = $now
+            RETURN count(i) AS cnt
+            """,
+            {"node_ids": body.node_ids, "group_id": body.group_id, "now": now},
+        )
+        rec = await res.single()
+        await res.consume()
+        return rec["cnt"] if rec else 0
+
+    updated_count = await session.execute_write(_do_bulk_group)
+    return {"updated_count": updated_count, "group_id": body.group_id}
 
 
 # ------------------------------------------------------------------------------

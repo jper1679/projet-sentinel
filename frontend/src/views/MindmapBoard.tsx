@@ -2,7 +2,7 @@
 // Projet Sentinel — MindmapBoard (Vue canevas principal React Flow)
 // =============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -33,6 +33,10 @@ import ScratchpadModal from '@/components/ScratchpadModal'
 import ImportXMindModal from '@/components/ImportXMindModal'
 import Toolbar from '@/components/Toolbar'
 
+import { SelectionMode } from '@xyflow/react'
+import SelectionActionBar from '@/components/SelectionActionBar'
+import { applySelectiveAutoLayout } from '@/utils/layoutUtils'
+
 // Types de nœuds enregistrés
 const NODE_TYPES = { sentinel: CustomMindmapNode }
 
@@ -53,6 +57,7 @@ function MindmapBoardContent() {
   const setEdgesStore = useAppStore((s) => s.setEdges)
   const addNodeStore = useAppStore((s) => s.addNode)
   const addEdgeStore = useAppStore((s) => s.addEdge)
+  const removeNodeStore = useAppStore((s) => s.removeNode)
   const updateNodePositionStore = useAppStore((s) => s.updateNodePosition)
   const removeEdgeStore = useAppStore((s) => s.removeEdge)
   const selectNodeStore = useAppStore((s) => s.selectNode)
@@ -271,6 +276,76 @@ function MindmapBoardContent() {
   )
 
   // -------------------------------------------------------------------------
+  // Multi-sélection & Groupement en bloc solidaire
+  // -------------------------------------------------------------------------
+  const selectedNodes = useMemo(() => rfNodes.filter((n) => n.selected), [rfNodes])
+  const selectedCount = selectedNodes.length
+
+  const isAllGrouped = useMemo(() => {
+    if (selectedCount < 2) return false
+    const firstGroupId = selectedNodes[0].data?.group_id
+    if (!firstGroupId) return false
+    return selectedNodes.every((n) => n.data?.group_id === firstGroupId)
+  }, [selectedNodes, selectedCount])
+
+  // Ref pour suivre les positions initiales lors d'un drag (multi-nœuds ou bloc)
+  const dragStartPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+
+  const handleNodeDragStart: OnNodeDrag<SentinelNode> = useCallback(
+    (_event, draggedNode) => {
+      const positionsMap = new Map<string, { x: number; y: number }>()
+      const groupId = draggedNode.data?.group_id
+
+      let nodesToTrack: SentinelNode[] = []
+      if (groupId) {
+        nodesToTrack = rfNodes.filter((n) => n.data?.group_id === groupId)
+      } else if (draggedNode.selected) {
+        nodesToTrack = rfNodes.filter((n) => n.selected)
+      } else {
+        nodesToTrack = [draggedNode]
+      }
+
+      nodesToTrack.forEach((n) => {
+        positionsMap.set(n.id, { x: n.position.x, y: n.position.y })
+      })
+
+      dragStartPositionsRef.current = positionsMap
+    },
+    [rfNodes],
+  )
+
+  const handleNodeDrag: OnNodeDrag<SentinelNode> = useCallback(
+    (_event, draggedNode) => {
+      const initialMap = dragStartPositionsRef.current
+      const draggedInitial = initialMap.get(draggedNode.id)
+      if (!draggedInitial) return
+
+      const dx = draggedNode.position.x - draggedInitial.x
+      const dy = draggedNode.position.y - draggedInitial.y
+
+      if (dx === 0 && dy === 0) return
+
+      setRfNodes((prevNodes) =>
+        prevNodes.map((n) => {
+          if (n.id === draggedNode.id) return draggedNode
+          if (initialMap.has(n.id)) {
+            const start = initialMap.get(n.id)!
+            return {
+              ...n,
+              position: {
+                x: start.x + dx,
+                y: start.y + dy,
+              },
+            }
+          }
+          return n
+        }),
+      )
+    },
+    [setRfNodes],
+  )
+
+  // -------------------------------------------------------------------------
   // Persistance déplacement (debounced 500ms)
   // -------------------------------------------------------------------------
   const persistPosition = useMemo(
@@ -287,11 +362,131 @@ function MindmapBoardContent() {
   )
 
   const handleNodeDragStop: OnNodeDrag<SentinelNode> = useCallback(
-    (_event, node) => {
-      persistPosition(node.id, node.position.x, node.position.y)
+    async (_event, draggedNode) => {
+      const initialMap = dragStartPositionsRef.current
+      if (initialMap.size === 0) {
+        persistPosition(draggedNode.id, draggedNode.position.x, draggedNode.position.y)
+        return
+      }
+
+      const affectedIds = Array.from(initialMap.keys())
+      const updatedNodes = rfNodes.filter((n) => affectedIds.includes(n.id))
+
+      try {
+        await Promise.all(
+          updatedNodes.map((n) => nodeService.updatePosition(n.id, n.position.x, n.position.y)),
+        )
+        updatedNodes.forEach((n) => updateNodePositionStore(n.id, n.position.x, n.position.y))
+      } catch (err) {
+        console.error('Erreur persistance déplacement groupe:', err)
+      } finally {
+        dragStartPositionsRef.current.clear()
+      }
     },
-    [persistPosition],
+    [rfNodes, persistPosition, updateNodePositionStore],
   )
+
+  // -------------------------------------------------------------------------
+  // Suppression de nœuds (Canvas keyboard Delete/Backspace key)
+  // -------------------------------------------------------------------------
+  const handleNodesDelete = useCallback(
+    async (nodesToDelete: SentinelNode[]) => {
+      for (const node of nodesToDelete) {
+        try {
+          await nodeService.delete(node.id)
+          removeNodeStore(node.id)
+        } catch (err) {
+          console.error('Erreur suppression nœud via canvas:', err)
+        }
+      }
+    },
+    [removeNodeStore],
+  )
+
+  // -------------------------------------------------------------------------
+  // Actions de la SelectionActionBar
+  // -------------------------------------------------------------------------
+  const handleGroupSelection = useCallback(async () => {
+    const selectedIds = selectedNodes.map((n) => n.id)
+    if (selectedIds.length < 2) return
+
+    const newGroupId = `group-${Date.now()}`
+    try {
+      await nodeService.bulkGroupNodes(selectedIds, newGroupId)
+      setRfNodes((prev) =>
+        prev.map((n) =>
+          selectedIds.includes(n.id)
+            ? { ...n, data: { ...n.data, group_id: newGroupId } }
+            : n,
+        ),
+      )
+    } catch (err) {
+      console.error('Erreur lors du groupement:', err)
+      alert('Erreur lors du groupement des nœuds.')
+    }
+  }, [selectedNodes, setRfNodes])
+
+  const handleUngroupSelection = useCallback(async () => {
+    const selectedIds = selectedNodes.map((n) => n.id)
+    if (selectedIds.length === 0) return
+
+    try {
+      await nodeService.bulkGroupNodes(selectedIds, null)
+      setRfNodes((prev) =>
+        prev.map((n) =>
+          selectedIds.includes(n.id)
+            ? { ...n, data: { ...n.data, group_id: undefined } }
+            : n,
+        ),
+      )
+    } catch (err) {
+      console.error('Erreur lors du dégroupement:', err)
+      alert('Erreur lors de la dissolution du groupe.')
+    }
+  }, [selectedNodes, setRfNodes])
+
+  const handleSelectiveLayout = useCallback(
+    async (direction: LayoutDirection) => {
+      const selectedIds = selectedNodes.map((n) => n.id)
+      if (selectedIds.length === 0) return
+
+      const layoutedNodes = applySelectiveAutoLayout(rfNodes, selectedIds, rfEdges, direction)
+      setRfNodes(layoutedNodes)
+      setNodesStore(layoutedNodes)
+
+      const updatedSelected = layoutedNodes.filter((n) => selectedIds.includes(n.id))
+      try {
+        await Promise.all(
+          updatedSelected.map((node) =>
+            nodeService.updatePosition(node.id, node.position.x, node.position.y),
+          ),
+        )
+      } catch (err) {
+        console.error('Erreur sauvegarde arrangement sélectif:', err)
+      }
+    },
+    [selectedNodes, rfNodes, rfEdges, setRfNodes, setNodesStore],
+  )
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedCount === 0) return
+    if (!window.confirm(`Voulez-vous vraiment supprimer définitivement les ${selectedCount} nœuds sélectionnés ?`)) return
+
+    const selectedIds = new Set(selectedNodes.map((n) => n.id))
+    for (const node of selectedNodes) {
+      try {
+        await nodeService.delete(node.id)
+        removeNodeStore(node.id)
+      } catch (err) {
+        console.error('Erreur suppression nœud:', err)
+      }
+    }
+
+    setRfNodes((prev) => prev.filter((n) => !selectedIds.has(n.id)))
+    setRfEdges((prev) =>
+      prev.filter((e) => !selectedIds.has(e.source) && !selectedIds.has(e.target)),
+    )
+  }, [selectedCount, selectedNodes, removeNodeStore, setRfNodes, setRfEdges])
 
   // -------------------------------------------------------------------------
   // Suppression d'arête
@@ -318,7 +513,10 @@ function MindmapBoardContent() {
         onNodesChange={onNodesChange as OnNodesChange}
         onEdgesChange={onEdgesChange as OnEdgesChange}
         onConnect={handleConnect}
+        onNodeDragStart={handleNodeDragStart}
+        onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
+        onNodesDelete={handleNodesDelete as (nodes: SentinelNode[]) => void}
         onEdgesDelete={handleEdgesDelete as (edges: SentinelEdge[]) => void}
         onPaneClick={() => selectNodeStore(null)}
         onDoubleClick={handlePaneDoubleClick}
@@ -328,6 +526,9 @@ function MindmapBoardContent() {
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={4}
+        selectionMode={SelectionMode.Partial}
+        selectionOnDrag={true}
+        panOnDrag={[1, 2]}
         deleteKeyCode={['Backspace', 'Delete']}
         proOptions={{ hideAttribution: true }}
         style={{ background: '#0a0e1a' }}
@@ -380,6 +581,16 @@ function MindmapBoardContent() {
           </Panel>
         )}
       </ReactFlow>
+
+      {/* Barre d'actions de sélection multiple */}
+      <SelectionActionBar
+        selectedCount={selectedCount}
+        isAllGrouped={isAllGrouped}
+        onGroup={handleGroupSelection}
+        onUngroup={handleUngroupSelection}
+        onSelectiveLayout={handleSelectiveLayout}
+        onDeleteSelected={handleDeleteSelected}
+      />
 
       {/* Modale de création de lien explicite */}
       <CreateLinkModal

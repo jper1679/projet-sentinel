@@ -31,6 +31,7 @@ export interface SentinelNodeData extends Record<string, unknown> {
   priorite: ItemPriorite
   temps_estime_h?: number
   cout_estime?: number
+  group_id?: string
   created_at: string
   updated_at: string
 }

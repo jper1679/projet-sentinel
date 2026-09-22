@@ -137,3 +137,61 @@ export function applyAutoLayout(
 
   return result
 }
+
+export function applySelectiveAutoLayout(
+  allNodes: SentinelNode[],
+  selectedIds: string[],
+  edges: SentinelEdge[],
+  direction: LayoutDirection = 'LR',
+): SentinelNode[] {
+  if (selectedIds.length === 0) return allNodes
+
+  const selectedSet = new Set(selectedIds)
+  const selectedNodes = allNodes.filter((n) => selectedSet.has(n.id))
+  if (selectedNodes.length === 0) return allNodes
+
+  // Calcul du centre géométrique des nœuds sélectionnés avant arrangement
+  let sumX = 0
+  let sumY = 0
+  selectedNodes.forEach((n) => {
+    sumX += n.position.x
+    sumY += n.position.y
+  })
+  const originalCenterX = sumX / selectedNodes.length
+  const originalCenterY = sumY / selectedNodes.length
+
+  // Filtrer les arêtes reliant les nœuds sélectionnés
+  const selectedEdges = edges.filter(
+    (e) => selectedSet.has(e.source) && selectedSet.has(e.target)
+  )
+
+  // Appliquer le layout sur le sous-ensemble
+  const layoutedSelected = applyAutoLayout(selectedNodes, selectedEdges, direction)
+
+  // Calcul du nouveau centre géométrique
+  let newSumX = 0
+  let newSumY = 0
+  layoutedSelected.forEach((n) => {
+    newSumX += n.position.x
+    newSumY += n.position.y
+  })
+  const newCenterX = newSumX / layoutedSelected.length
+  const newCenterY = newSumY / layoutedSelected.length
+
+  const offsetX = originalCenterX - newCenterX
+  const offsetY = originalCenterY - newCenterY
+
+  // Repositionner en ajustant l'offset pour maintenir le centre de gravité
+  const updatedMap = new Map<string, SentinelNode>()
+  layoutedSelected.forEach((n) => {
+    updatedMap.set(n.id, {
+      ...n,
+      position: {
+        x: n.position.x + offsetX,
+        y: n.position.y + offsetY,
+      },
+    })
+  })
+
+  return allNodes.map((n) => updatedMap.get(n.id) || n)
+}
