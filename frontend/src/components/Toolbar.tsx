@@ -2,7 +2,8 @@ import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Network, LogOut, RefreshCw, ZoomIn, ZoomOut,
-  Maximize, Info, Plus, Link2, LayoutGrid, ChevronDown, Sparkles, Eye, Check, BarChart2
+  Maximize, Info, Plus, Link2, LayoutGrid, ChevronDown, Sparkles, Eye, Check, BarChart2,
+  CheckSquare, Layers, Download
 } from 'lucide-react'
 import { useReactFlow } from '@xyflow/react'
 import { useAppStore, type NodeVisibleFields } from '@/store/useAppStore'
@@ -32,6 +33,9 @@ export default function Toolbar({
   const navigate = useNavigate()
   const logout = useAppStore((s) => s.logout)
   const user = useAppStore((s) => s.user)
+  const nodes = useAppStore((s) => s.nodes)
+  const edges = useAppStore((s) => s.edges)
+
   const DEFAULT_VF = { type: true, statut: true, priorite: true, temps_estime_h: true, cout_estime: true, description: false }
   const rawVF = useAppStore((s) => s.visibleFields)
   const visibleFields = rawVF ? { ...DEFAULT_VF, ...rawVF } : DEFAULT_VF
@@ -40,6 +44,35 @@ export default function Toolbar({
 
   const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false)
   const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false)
+
+  // Handler d'exportation JSON du graphe
+  const handleExportJSON = useCallback(() => {
+    const exportData = {
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      node_count: nodes.length,
+      edge_count: edges.length,
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        position: n.position,
+        data: n.data,
+      })),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        data: e.data,
+      })),
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sentinel-graph-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [nodes, edges])
 
   // Ecouteur du raccourci clavier Ctrl+K pour ouvrir le Scratchpad
   useEffect(() => {
@@ -78,7 +111,7 @@ export default function Toolbar({
       className="absolute top-4 left-4 z-20 flex flex-col gap-2.5"
       style={{ pointerEvents: 'all' }}
     >
-      {/* Logo / Titre & Bouton Vue Gantt */}
+      {/* Logo / Titre & Navigation par Onglets Principaux */}
       <div
         className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl"
         style={{
@@ -105,13 +138,37 @@ export default function Toolbar({
           </div>
         </div>
 
-        <button
-          onClick={() => navigate('/gantt')}
-          className="btn-ghost px-2.5 py-1 text-xs text-purple-400 hover:text-white hover:bg-purple-600/30 border border-purple-500/30 rounded-lg flex items-center gap-1.5 ml-2 font-semibold"
-          title="Ouvrir la vue chronologique Gantt"
-        >
-          <BarChart2 size={13} /> Vue Gantt
-        </button>
+        {/* Barre d'onglets principaux (Carte, Kanban, Gantt, Liste) */}
+        <div className="flex items-center gap-1 bg-[#0a0e1a] border border-[#1e2d45] rounded-lg p-1 ml-2">
+          <button
+            onClick={() => navigate('/')}
+            className="px-2 py-1 rounded text-xs font-semibold bg-blue-600/30 text-blue-300 border border-blue-500/40 flex items-center gap-1"
+            title="Vue Carte Mindmap"
+          >
+            📍 Carte
+          </button>
+          <button
+            onClick={() => navigate('/kanban')}
+            className="px-2 py-1 rounded text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#1e2d45] transition-colors flex items-center gap-1"
+            title="Tableau Kanban Jira"
+          >
+            <CheckSquare size={12} className="text-blue-400" /> Kanban
+          </button>
+          <button
+            onClick={() => navigate('/gantt')}
+            className="px-2 py-1 rounded text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#1e2d45] transition-colors flex items-center gap-1"
+            title="Diagramme Gantt MS Project"
+          >
+            <BarChart2 size={12} className="text-purple-400" /> Gantt
+          </button>
+          <button
+            onClick={() => navigate('/list')}
+            className="px-2 py-1 rounded text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#1e2d45] transition-colors flex items-center gap-1"
+            title="Vue Tableau Liste"
+          >
+            <Layers size={12} className="text-emerald-400" /> Liste
+          </button>
+        </div>
       </div>
 
       {/* Actions rapides : + Nœud, + Lien, Scratchpad, Auto-Arrangement & Champs affichés */}

@@ -3,12 +3,12 @@
 // Accessible via la route /node/:id
 // =============================================================================
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Save, Trash2, Tag, CheckCircle, AlertTriangle, Clock,
   DollarSign, FileText, Share2, Layers, RefreshCw,
-  ShieldAlert, Sparkles, Check, Plus, BarChart2, Link2
+  ShieldAlert, Sparkles, Check, Plus, BarChart2, Link2, CheckSquare, MessageSquare
 } from 'lucide-react'
 
 import {
@@ -53,6 +53,8 @@ const LINK_TYPE_LABELS: Record<string, { label: string; icon: string; color: str
   LIE_A:          { label: 'Lié à',                  icon: '🔗', color: '#3b82f6' },
 }
 
+const strId = () => Math.random().toString(36).slice(2)
+
 export default function NodeDetailView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -79,6 +81,47 @@ export default function NodeDetailView() {
   const [newRelTargetId, setNewRelTargetId] = useState('')
   const [newRelType, setNewRelType] = useState<LinkType>('EXECUTE_AVANT')
   const [isAddingRel, setIsAddingRel] = useState(false)
+  // Sub-tasks checklist local state
+  const [checklist, setChecklist] = useState<{ id: string; text: string; done: boolean }[]>([])
+  const [newCheckitem, setNewCheckitem] = useState('')
+
+  // Comments / Notes history
+  const [comments, setComments] = useState<{ id: string; author: string; text: string; created_at: string }[]>([])
+  const [newComment, setNewComment] = useState('')
+
+  const handleAddCheckitem = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCheckitem.trim()) return
+    setChecklist((prev) => [...prev, { id: strId(), text: newCheckitem.trim(), done: false }])
+    setNewCheckitem('')
+  }
+
+  const toggleCheckitem = (itemId: string) => {
+    setChecklist((prev) => prev.map((item) => (item.id === itemId ? { ...item, done: !item.done } : item)))
+  }
+
+  const deleteCheckitem = (itemId: string) => {
+    setChecklist((prev) => prev.filter((item) => item.id !== itemId))
+  }
+
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newComment.trim()) return
+    const commentObj = {
+      id: strId(),
+      author: 'Utilisateur',
+      text: newComment.trim(),
+      created_at: new Date().toISOString(),
+    }
+    setComments((prev) => [commentObj, ...prev])
+    setNewComment('')
+  }
+
+  const checklistProgress = useMemo(() => {
+    if (checklist.length === 0) return 0
+    const doneCount = checklist.filter((item) => item.done).length
+    return Math.round((doneCount / checklist.length) * 100)
+  }, [checklist])
 
   // Charger le nœud et les relations
   const loadData = useCallback(async () => {
@@ -315,6 +358,74 @@ export default function NodeDetailView() {
               placeholder="Saisissez la description détaillée, les critères d'acceptation, les spécifications techniques ou notes d'avancement..."
               className="w-full bg-[#0a0e1a] border border-[#1e2d45] rounded-xl p-4 text-sm text-slate-200 focus:border-blue-500 outline-none resize-y placeholder:text-slate-600 leading-relaxed"
             />
+          </div>
+
+          {/* Section Checklist & Sous-tâches Jira */}
+          <div className="bg-[#111827] border border-[#1e2d45] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#1e2d45] pb-3">
+              <span className="text-sm font-semibold text-white flex items-center gap-2">
+                <CheckSquare size={15} className="text-emerald-400" /> Checklist & Sous-tâches ({checklist.length})
+              </span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">{checklistProgress}%</span>
+            </div>
+
+            {/* Barre de progression */}
+            {checklist.length > 0 && (
+              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
+                  style={{ width: `${checklistProgress}%` }}
+                />
+              </div>
+            )}
+
+            {/* Formulaire d'ajout d'élément à la checklist */}
+            <form onSubmit={handleAddCheckitem} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ajouter une sous-tâche ou critère d'acceptation..."
+                value={newCheckitem}
+                onChange={(e) => setNewCheckitem(e.target.value)}
+                className="flex-1 bg-[#0a0e1a] border border-[#1e2d45] rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-emerald-500"
+              />
+              <button type="submit" className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
+                <Plus size={13} /> Ajouter
+              </button>
+            </form>
+
+            {/* Liste des sous-tâches */}
+            {checklist.length === 0 ? (
+              <div className="text-xs text-slate-500 text-center py-3 italic">
+                Aucune sous-tâche définie. Ajoutez des critères pour suivre l'avancement.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {checklist.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#0a0e1a] border border-[#1e2d45] hover:border-emerald-500/40 transition-colors group"
+                  >
+                    <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleCheckitem(item.id)}
+                        className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer"
+                      />
+                      <span className={`text-xs ${item.done ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+                        {item.text}
+                      </span>
+                    </label>
+                    <button
+                      onClick={() => deleteCheckitem(item.id)}
+                      className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Section Relations / Nœuds connectés & Dépendances */}

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, RefreshCw, Layers, ExternalLink, Filter, Search,
-  Calendar, Clock, ShieldAlert, CheckCircle2, PlayCircle, AlertOctagon, HelpCircle
+  Calendar, Clock, ShieldAlert, CheckCircle2, PlayCircle, AlertOctagon, HelpCircle, DollarSign
 } from 'lucide-react'
 
 import { nodeService, type NodeAPIResponse } from '@/services/nodeService'
@@ -159,6 +159,17 @@ export default function GanttView() {
     return filteredTasks.reduce((max, t) => Math.max(max, t.level), 0)
   }, [filteredTasks])
 
+  // Calcul des métriques globales style MS Project
+  const projectMetrics = useMemo(() => {
+    const totalTime = nodes.reduce((sum, n) => sum + (n.temps_estime_h || 0), 0)
+    const totalCost = nodes.reduce((sum, n) => sum + (n.cout_estime || 0), 0)
+    const completedCount = nodes.filter((n) => n.statut === 'TERMINE').length
+    const blockedCount = nodes.filter((n) => n.statut === 'BLOQUE').length
+    const progressPct = nodes.length > 0 ? Math.round((completedCount / nodes.length) * 100) : 0
+
+    return { totalTime, totalCost, completedCount, blockedCount, progressPct }
+  }, [nodes])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0e1a] text-slate-400">
@@ -194,7 +205,13 @@ export default function GanttView() {
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white bg-[#1e2d45]/50 hover:bg-[#1e2d45] px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors"
           >
-            <ArrowLeft size={14} /> Retour à la carte
+            <ArrowLeft size={14} /> Carte
+          </button>
+          <button
+            onClick={() => navigate('/kanban')}
+            className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white bg-[#1e2d45]/50 hover:bg-[#1e2d45] px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors"
+          >
+            <CheckCircle2 size={14} className="text-blue-400" /> Kanban Jira
           </button>
           <div className="h-4 w-[1px] bg-slate-700" />
           <div className="flex items-center gap-2">
@@ -202,8 +219,8 @@ export default function GanttView() {
               <Calendar size={16} />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white leading-none">Diagramme de Gantt & Dépendances</h1>
-              <p className="text-[11px] text-slate-400 leading-tight">Ordonnancement des tâches par ordre d'exécution</p>
+              <h1 className="text-sm font-bold text-white leading-none">Diagramme de Gantt & Dépendances MS Project</h1>
+              <p className="text-[11px] text-slate-400 leading-tight">Ordonnancement des tâches et métriques de projet</p>
             </div>
           </div>
         </div>
@@ -219,6 +236,57 @@ export default function GanttView() {
           </button>
         </div>
       </header>
+
+      {/* Bandeau de Métriques MS Project */}
+      <div className="bg-[#0f172a] border-b border-[#1e2d45] px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#111827] border border-[#1e2d45]">
+          <div className="p-2 rounded-lg bg-blue-500/15 text-blue-400">
+            <Clock size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-bold">Durée totale</div>
+            <div className="text-sm font-bold text-white font-mono">{projectMetrics.totalTime} h</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#111827] border border-[#1e2d45]">
+          <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400">
+            <DollarSign size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-bold">Budget estimé</div>
+            <div className="text-sm font-bold text-emerald-400 font-mono">${projectMetrics.totalCost.toLocaleString('fr-CA')}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#111827] border border-[#1e2d45]">
+          <div className="p-2 rounded-lg bg-purple-500/15 text-purple-400">
+            <CheckCircle2 size={16} />
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] text-slate-400 uppercase font-bold flex justify-between">
+              <span>Avancement</span>
+              <span className="text-purple-400">{projectMetrics.progressPct}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-800 rounded-full mt-1 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-500"
+                style={{ width: `${projectMetrics.progressPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#111827] border border-[#1e2d45]">
+          <div className="p-2 rounded-lg bg-red-500/15 text-red-400">
+            <ShieldAlert size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400 uppercase font-bold">Tâches bloquées</div>
+            <div className="text-sm font-bold text-red-400 font-mono">{projectMetrics.blockedCount} 🔒</div>
+          </div>
+        </div>
+      </div>
 
       {/* Toolbar / Filtres */}
       <div className="bg-[#111827] border-b border-[#1e2d45] px-6 py-3 flex flex-wrap items-center justify-between gap-3">
