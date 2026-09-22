@@ -91,7 +91,8 @@ async def create_node(
     now = datetime.now(timezone.utc).isoformat()
     node_id = str(uuid.uuid4())
 
-    await session.run(
+    record = await run_single(
+        session,
         """
         CREATE (i:Item {
             id:             $id,
@@ -107,6 +108,11 @@ async def create_node(
             created_at:     $created_at,
             updated_at:     $updated_at
         })
+        RETURN i {
+            .id, .titre, .description, .type, .statut, .priorite,
+            .temps_estime_h, .cout_estime, .pos_x, .pos_y,
+            .created_at, .updated_at
+        } AS n
         """,
         {
             "id": node_id,
@@ -123,21 +129,9 @@ async def create_node(
             "updated_at": now,
         },
     )
-
-    return NodeOut(
-        id=node_id,
-        titre=body.titre,
-        description=body.description,
-        type=body.type,
-        statut=body.statut,
-        priorite=body.priorite,
-        temps_estime_h=body.temps_estime_h,
-        cout_estime=body.cout_estime,
-        pos_x=body.pos_x,
-        pos_y=body.pos_y,
-        created_at=now,
-        updated_at=now,
-    )
+    if not record:
+        raise HTTPException(status_code=500, detail="Échec de la création du nœud")
+    return _row_to_node(record)
 
 
 # ------------------------------------------------------------------------------

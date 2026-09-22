@@ -125,10 +125,13 @@ async def create_link(
         """,
     }
 
-    await session.run(
+    res = await run_single(
+        session,
         cypher_map[rel_type],
         {"src": body.source_id, "tgt": body.target_id, "id": link_id, "created_at": now},
     )
+    if not res:
+        raise HTTPException(status_code=500, detail="Échec de la création de la relation")
 
     return LinkOut(
         id=link_id,
