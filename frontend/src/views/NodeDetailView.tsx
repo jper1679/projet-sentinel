@@ -86,11 +86,7 @@ export default function NodeDetailView() {
     setLoading(true)
     setError(null)
     try {
-      const [nodeRes, allLinksRes, allNodesRes] = await Promise.all([
-        nodeService.getById(id),
-        linkService.getAll(),
-        nodeService.getAll(),
-      ])
+      const nodeRes = await nodeService.getById(id)
       setNodeData(nodeRes)
       setForm({
         titre: nodeRes.titre,
@@ -101,8 +97,17 @@ export default function NodeDetailView() {
         temps_estime_h: nodeRes.temps_estime_h,
         cout_estime: nodeRes.cout_estime,
       })
-      setLinks(allLinksRes.filter((l) => l.source_id === id || l.target_id === id))
-      setAllNodes(allNodesRes)
+
+      try {
+        const [allLinksRes, allNodesRes] = await Promise.all([
+          linkService.getAll(),
+          nodeService.getAll(),
+        ])
+        setLinks(allLinksRes.filter((l) => l.source_id === id || l.target_id === id))
+        setAllNodes(allNodesRes)
+      } catch (relErr) {
+        console.warn('Avertissement chargement relations secondaires:', relErr)
+      }
     } catch (err: unknown) {
       console.error('Erreur chargement détail nœud:', err)
       setError('Impossible de charger le nœud demandé ou nœud introuvable.')

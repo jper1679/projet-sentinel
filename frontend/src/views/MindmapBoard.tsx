@@ -24,7 +24,7 @@ import '@xyflow/react/dist/style.css'
 
 import { useAppStore, type SentinelNode, type SentinelEdge, type SentinelNodeData } from '@/store/useAppStore'
 import { nodeService, apiNodeToFlowData } from '@/services/nodeService'
-import { linkService, type LinkType } from '@/services/linkService'
+import { linkService, type LinkType, type LinkAPIResponse } from '@/services/linkService'
 import { applyAutoLayout, type LayoutDirection } from '@/utils/layoutUtils'
 import CustomMindmapNode from '@/components/CustomMindmapNode'
 import NodeDetailDrawer from '@/components/NodeDetailDrawer'
@@ -71,10 +71,14 @@ function MindmapBoardContent() {
   const loadGraph = useCallback(async () => {
     setLoading(true)
     try {
-      const [apiNodes, apiLinks] = await Promise.all([
-        nodeService.getAll(),
-        linkService.getAll(),
-      ])
+      const apiNodes = await nodeService.getAll()
+
+      let apiLinks: LinkAPIResponse[] = []
+      try {
+        apiLinks = await linkService.getAll()
+      } catch (linkErr) {
+        console.warn('Erreur de chargement des liens (mode dégradé):', linkErr)
+      }
 
       const flowNodes: SentinelNode[] = apiNodes.map((n) => ({
         id: n.id,

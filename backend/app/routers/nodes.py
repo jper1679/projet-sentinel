@@ -19,21 +19,44 @@ router = APIRouter()
 
 
 def _row_to_node(row: dict) -> NodeOut:
-    """Convertit un record Neo4j en NodeOut."""
-    n = row.get("n", row)  # Support direct properties ou alias
+    """Convertit un record Neo4j en NodeOut de manière totalement résiliente."""
+    n = row.get("n", row) if isinstance(row, dict) else {}
+
+    raw_type = str(n.get("type") or "IDEE").upper().strip()
+    valid_types = {"IDEE", "TACHE", "PROJET", "COMPOSANT", "PROCEDURE", "ETAPE"}
+    node_type = raw_type if raw_type in valid_types else "IDEE"
+
+    raw_statut = str(n.get("statut") or "A_FAIRE").upper().strip()
+    if "BLOQ" in raw_statut:
+        node_statut = "BLOQUE"
+    elif "EN_COURS" in raw_statut or "COURS" in raw_statut or "DOING" in raw_statut:
+        node_statut = "EN_COURS"
+    elif "TERMINE" in raw_statut or "DONE" in raw_statut or "FINI" in raw_statut:
+        node_statut = "TERMINE"
+    elif "BACKLOG" in raw_statut:
+        node_statut = "BACKLOG"
+    else:
+        node_statut = "A_FAIRE"
+
+    raw_prio = str(n.get("priorite") or "NORMALE").upper().strip()
+    valid_prios = {"BASSE", "NORMALE", "HAUTE", "CRITIQUE"}
+    node_prio = raw_prio if raw_prio in valid_prios else "NORMALE"
+
+    now = datetime.now(timezone.utc).isoformat()
+
     return NodeOut(
-        id=n["id"],
-        titre=n["titre"],
+        id=str(n.get("id") or uuid.uuid4()),
+        titre=str(n.get("titre") or "Sans titre"),
         description=n.get("description"),
-        type=n["type"],
-        statut=n["statut"],
-        priorite=n["priorite"],
-        temps_estime_h=n.get("temps_estime_h"),
-        cout_estime=n.get("cout_estime"),
-        pos_x=n.get("pos_x", 0.0),
-        pos_y=n.get("pos_y", 0.0),
-        created_at=n["created_at"],
-        updated_at=n["updated_at"],
+        type=node_type,
+        statut=node_statut,
+        priorite=node_prio,
+        temps_estime_h=float(n["temps_estime_h"]) if n.get("temps_estime_h") is not None else None,
+        cout_estime=float(n["cout_estime"]) if n.get("cout_estime") is not None else None,
+        pos_x=float(n.get("pos_x", 0.0)),
+        pos_y=float(n.get("pos_y", 0.0)),
+        created_at=str(n.get("created_at") or now),
+        updated_at=str(n.get("updated_at") or now),
     )
 
 

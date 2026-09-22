@@ -31,6 +31,24 @@ VALID_RELATIONS = {
 }
 
 
+def _row_to_link(row: dict) -> LinkOut:
+    raw_type = str(row.get("type") or "LIE_A").upper().strip()
+    valid_types = {
+        "EXECUTE_AVANT", "BLOQUEE_PAR", "RATTACHE_A",
+        "ASSIGNE_A", "SUIVIE_DE", "CONTIENT_ETAPE", "LIE_A"
+    }
+    link_type = raw_type if raw_type in valid_types else "LIE_A"
+    now = datetime.now(timezone.utc).isoformat()
+
+    return LinkOut(
+        id=str(row.get("id") or uuid.uuid4()),
+        source_id=str(row.get("source_id")),
+        target_id=str(row.get("target_id")),
+        type=link_type,
+        created_at=str(row.get("created_at") or now),
+    )
+
+
 # ------------------------------------------------------------------------------
 # GET /api/links
 # ------------------------------------------------------------------------------
@@ -52,7 +70,7 @@ async def list_links(
         ORDER BY r.created_at DESC
         """,
     )
-    return [LinkOut(**r) for r in records]
+    return [_row_to_link(r) for r in records if r.get("source_id") and r.get("target_id")]
 
 
 # ------------------------------------------------------------------------------
