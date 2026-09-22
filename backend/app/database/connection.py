@@ -57,14 +57,17 @@ INDEXES = [
 ]
 
 
+from app.database.migration import run_migrations
+
 async def init_db() -> None:
-    """Crée les contraintes et index Neo4j au démarrage."""
+    """Crée les contraintes et index Neo4j au démarrage et exécute les migrations."""
     driver = await get_driver()
     try:
         async with driver.session(database="neo4j") as session:
             for cypher in CONSTRAINTS + INDEXES:
                 await session.run(cypher)
         logger.info("Neo4j constraints and indexes applied")
+        await run_migrations(driver)
     except ServiceUnavailable as e:
         logger.error("Neo4j not reachable", error=str(e))
         raise

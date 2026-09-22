@@ -1,12 +1,8 @@
-// =============================================================================
-// Projet Sentinel — NodeDetailDrawer (Tiroir latéral d'enrichissement)
-// S'ouvre au clic sur un nœud, permet d'éditer tous les attributs
-// =============================================================================
-
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   X, Tag, Clock, DollarSign, FileText, Save, Trash2,
-  AlertTriangle, Layers, CheckCircle
+  AlertTriangle, Layers, CheckCircle, ExternalLink
 } from 'lucide-react'
 import { useAppStore, type SentinelNodeData, type ItemType, type ItemStatut, type ItemPriorite } from '@/store/useAppStore'
 import { nodeService } from '@/services/nodeService'
@@ -39,6 +35,7 @@ interface NodeDetailDrawerProps {
 }
 
 export default function NodeDetailDrawer({ onNodeUpdated, onNodeDeleted }: NodeDetailDrawerProps = {}) {
+  const navigate = useNavigate()
   const selectedNodeId = useAppStore((s) => s.selectedNodeId)
   const isDrawerOpen = useAppStore((s) => s.isDrawerOpen)
   const setDrawerOpen = useAppStore((s) => s.setDrawerOpen)
@@ -63,6 +60,13 @@ export default function NodeDetailDrawer({ onNodeUpdated, onNodeDeleted }: NodeD
   const handleClose = useCallback(() => {
     setDrawerOpen(false)
   }, [setDrawerOpen])
+
+  const handleOpenFullPage = useCallback(() => {
+    if (selectedNodeId) {
+      setDrawerOpen(false)
+      navigate(`/node/${selectedNodeId}`)
+    }
+  }, [selectedNodeId, setDrawerOpen, navigate])
 
   const handleSave = useCallback(async () => {
     if (!selectedNodeId || !form) return
@@ -136,9 +140,20 @@ export default function NodeDetailDrawer({ onNodeUpdated, onNodeDeleted }: NodeD
             <Layers size={16} className="text-sentinel-accent" />
             <span className="text-sm font-semibold text-sentinel-text">Détail du nœud</span>
           </div>
-          <button onClick={handleClose} className="btn-ghost p-1.5 rounded-lg">
-            <X size={16} />
-          </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleOpenFullPage}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="btn-ghost px-2 py-1 text-xs text-blue-400 hover:text-white hover:bg-blue-600/30 border border-blue-500/30 rounded-lg flex items-center gap-1"
+              title="Ouvrir en page complète style Jira"
+            >
+              <ExternalLink size={12} /> Pleine page
+            </button>
+            <button onClick={handleClose} className="btn-ghost p-1.5 rounded-lg">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Corps scrollable */}

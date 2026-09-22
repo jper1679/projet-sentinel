@@ -4,7 +4,14 @@
 
 import api from './api'
 
-export type LinkType = 'BLOQUEE_PAR' | 'RATTACHE_A' | 'ASSIGNE_A' | 'LIE_A'
+export type LinkType =
+  | 'EXECUTE_AVANT'
+  | 'BLOQUEE_PAR'
+  | 'RATTACHE_A'
+  | 'ASSIGNE_A'
+  | 'SUIVIE_DE'
+  | 'CONTIENT_ETAPE'
+  | 'LIE_A'
 
 export interface LinkAPIResponse {
   id: string

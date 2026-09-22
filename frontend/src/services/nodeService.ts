@@ -41,6 +41,12 @@ export const nodeService = {
     return res.data
   },
 
+  /** Charge un nœud unique par son ID */
+  async getById(id: string): Promise<NodeAPIResponse> {
+    const res = await api.get<NodeAPIResponse>(`/nodes/${id}`)
+    return res.data
+  },
+
   /** Crée un nouveau nœud */
   async create(payload: NodeCreatePayload): Promise<NodeAPIResponse> {
     const res = await api.post<NodeAPIResponse>('/nodes/', payload)

@@ -20,7 +20,15 @@ from app.models.link import LinkCreate, LinkOut
 router = APIRouter()
 
 # Relations autorisées (liste blanche sécurité Cypher injection)
-VALID_RELATIONS = {"BLOQUEE_PAR", "RATTACHE_A", "ASSIGNE_A", "LIE_A"}
+VALID_RELATIONS = {
+    "EXECUTE_AVANT",
+    "BLOQUEE_PAR",
+    "RATTACHE_A",
+    "ASSIGNE_A",
+    "SUIVIE_DE",
+    "CONTIENT_ETAPE",
+    "LIE_A",
+}
 
 
 # ------------------------------------------------------------------------------
@@ -35,7 +43,10 @@ async def list_links(
         session,
         """
         MATCH (s:Item)-[r]->(t:Item)
-        WHERE type(r) IN ['BLOQUEE_PAR', 'RATTACHE_A', 'LIE_A']
+        WHERE type(r) IN [
+            'EXECUTE_AVANT', 'BLOQUEE_PAR', 'RATTACHE_A',
+            'ASSIGNE_A', 'SUIVIE_DE', 'CONTIENT_ETAPE', 'LIE_A'
+        ]
         RETURN r.id AS id, s.id AS source_id, t.id AS target_id,
                type(r) AS type, r.created_at AS created_at
         ORDER BY r.created_at DESC
@@ -76,9 +87,12 @@ async def create_link(
     link_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
-    # APOC-free : on utilise FOREACH trick pour les relations dynamiques
-    # Alternative sans APOC : on branche sur le type
     cypher_map = {
+        "EXECUTE_AVANT": """
+            MATCH (s:Item {id: $src}), (t:Item {id: $tgt})
+            CREATE (s)-[r:EXECUTE_AVANT {id: $id, created_at: $created_at}]->(t)
+            RETURN r.id AS id
+        """,
         "BLOQUEE_PAR": """
             MATCH (s:Item {id: $src}), (t:Item {id: $tgt})
             CREATE (s)-[r:BLOQUEE_PAR {id: $id, created_at: $created_at}]->(t)
@@ -92,6 +106,16 @@ async def create_link(
         "ASSIGNE_A": """
             MATCH (s:Item {id: $src}), (t:Item {id: $tgt})
             CREATE (s)-[r:ASSIGNE_A {id: $id, created_at: $created_at}]->(t)
+            RETURN r.id AS id
+        """,
+        "SUIVIE_DE": """
+            MATCH (s:Item {id: $src}), (t:Item {id: $tgt})
+            CREATE (s)-[r:SUIVIE_DE {id: $id, created_at: $created_at}]->(t)
+            RETURN r.id AS id
+        """,
+        "CONTIENT_ETAPE": """
+            MATCH (s:Item {id: $src}), (t:Item {id: $tgt})
+            CREATE (s)-[r:CONTIENT_ETAPE {id: $id, created_at: $created_at}]->(t)
             RETURN r.id AS id
         """,
         "LIE_A": """

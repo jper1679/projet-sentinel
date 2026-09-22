@@ -1,14 +1,11 @@
-// =============================================================================
-// Projet Sentinel — Toolbar (Barre d'outils du canevas)
-// =============================================================================
-
 import { useCallback, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Network, LogOut, RefreshCw, ZoomIn, ZoomOut,
-  Maximize, Info, Plus, Link2, LayoutGrid, ChevronDown, Sparkles
+  Maximize, Info, Plus, Link2, LayoutGrid, ChevronDown, Sparkles, Eye, Check, BarChart2
 } from 'lucide-react'
 import { useReactFlow } from '@xyflow/react'
-import { useAppStore } from '@/store/useAppStore'
+import { useAppStore, type NodeVisibleFields } from '@/store/useAppStore'
 import type { LayoutDirection } from '@/utils/layoutUtils'
 
 interface ToolbarProps {
@@ -32,11 +29,17 @@ export default function Toolbar({
   nodeCount,
   edgeCount,
 }: ToolbarProps) {
+  const navigate = useNavigate()
   const logout = useAppStore((s) => s.logout)
   const user = useAppStore((s) => s.user)
+  const DEFAULT_VF = { type: true, statut: true, priorite: true, temps_estime_h: true, cout_estime: true, description: false }
+  const rawVF = useAppStore((s) => s.visibleFields)
+  const visibleFields = rawVF ? { ...DEFAULT_VF, ...rawVF } : DEFAULT_VF
+  const toggleVisibleField = useAppStore((s) => s.toggleVisibleField)
   const { zoomIn, zoomOut, fitView } = useReactFlow()
 
   const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false)
+  const [isFieldsMenuOpen, setIsFieldsMenuOpen] = useState(false)
 
   // Ecouteur du raccourci clavier Ctrl+K pour ouvrir le Scratchpad
   useEffect(() => {
@@ -61,14 +64,23 @@ export default function Toolbar({
     setIsLayoutMenuOpen(false)
   }
 
+  const fieldLabels: { key: keyof NodeVisibleFields; label: string }[] = [
+    { key: 'type', label: 'Type de nœud' },
+    { key: 'statut', label: 'Statut' },
+    { key: 'priorite', label: 'Priorité' },
+    { key: 'temps_estime_h', label: 'Temps estimé (h)' },
+    { key: 'cout_estime', label: 'Coût estimé ($)' },
+    { key: 'description', label: 'Extrait description' },
+  ]
+
   return (
     <div
       className="absolute top-4 left-4 z-20 flex flex-col gap-2.5"
       style={{ pointerEvents: 'all' }}
     >
-      {/* Logo / Titre */}
+      {/* Logo / Titre & Bouton Vue Gantt */}
       <div
-        className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+        className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl"
         style={{
           background: 'rgba(17,24,39,0.92)',
           backdropFilter: 'blur(12px)',
@@ -76,23 +88,33 @@ export default function Toolbar({
           boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
         }}
       >
-        <div
-          className="flex items-center justify-center rounded-lg"
-          style={{
-            width: 28,
-            height: 28,
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-          }}
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center rounded-lg"
+            style={{
+              width: 28,
+              height: 28,
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            }}
+          >
+            <Network size={14} color="white" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-white leading-tight">Sentinel</div>
+            <div className="text-xs text-sentinel-muted leading-tight">PLM/ALM par graphe</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigate('/gantt')}
+          className="btn-ghost px-2.5 py-1 text-xs text-purple-400 hover:text-white hover:bg-purple-600/30 border border-purple-500/30 rounded-lg flex items-center gap-1.5 ml-2 font-semibold"
+          title="Ouvrir la vue chronologique Gantt"
         >
-          <Network size={14} color="white" />
-        </div>
-        <div>
-          <div className="text-sm font-bold text-white leading-tight">Sentinel</div>
-          <div className="text-xs text-sentinel-muted leading-tight">PLM/ALM par graphe</div>
-        </div>
+          <BarChart2 size={13} /> Vue Gantt
+        </button>
       </div>
 
-      {/* Actions rapides : + Nœud, + Lien, Scratchpad & Auto-Arrangement */}
+      {/* Actions rapides : + Nœud, + Lien, Scratchpad, Auto-Arrangement & Champs affichés */}
       <div
         className="flex flex-col gap-1.5 p-1.5 rounded-xl relative z-10"
         style={{
@@ -135,7 +157,10 @@ export default function Toolbar({
         <div className="relative z-20">
           <button
             id="btn-auto-layout"
-            onClick={() => setIsLayoutMenuOpen((v) => !v)}
+            onClick={() => {
+              setIsLayoutMenuOpen((v) => !v)
+              setIsFieldsMenuOpen(false)
+            }}
             className="w-full btn-ghost py-1.5 px-3 text-xs justify-between font-semibold border border-sentinel-border/60 hover:bg-sentinel-border/50 text-sentinel-text-dim hover:text-white"
             title="Réorganiser automatiquement la disposition du canevas"
           >
@@ -174,7 +199,64 @@ export default function Toolbar({
             </div>
           )}
         </div>
+
+        {/* Bouton Champs Affichés avec menu déroulant de sélection */}
+        <div className="relative z-20">
+          <button
+            id="btn-fields-menu"
+            onClick={() => {
+              setIsFieldsMenuOpen((v) => !v)
+              setIsLayoutMenuOpen(false)
+            }}
+            className="w-full btn-ghost py-1.5 px-3 text-xs justify-between font-semibold border border-sentinel-border/60 hover:bg-sentinel-border/50 text-sentinel-text-dim hover:text-white"
+            title="Choisir les champs affichés sur les nœuds"
+          >
+            <span className="flex items-center gap-1.5">
+              <Eye size={13} className="text-cyan-400" /> Champs affichés
+            </span>
+            <ChevronDown size={12} className={`transition-transform ${isFieldsMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Sous-menu Sélection des champs */}
+          {isFieldsMenuOpen && (
+            <div
+              className="absolute left-0 top-full mt-1.5 w-full min-w-[210px] rounded-xl p-2 z-50 animate-fade-in space-y-1"
+              style={{
+                background: 'rgba(17, 24, 39, 0.98)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid #2a3e5c',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+              }}
+            >
+              <div className="text-[10px] uppercase font-bold text-sentinel-muted px-2 py-1 tracking-wider border-b border-sentinel-border/50 mb-1">
+                Champs visibles sur les blocs
+              </div>
+              {fieldLabels.map(({ key, label }) => {
+                const active = visibleFields[key]
+                return (
+                  <button
+                    key={key}
+                    onClick={() => toggleVisibleField(key)}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-sentinel-border/60 transition-colors text-left"
+                  >
+                    <span className={active ? 'text-white font-medium' : 'text-sentinel-muted'}>
+                      {label}
+                    </span>
+                    <div
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                        active ? 'bg-blue-600 border-blue-500 text-white' : 'border-sentinel-border bg-slate-800'
+                      }`}
+                    >
+                      {active && <Check size={11} />}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
+
 
       {/* Stats */}
       <div

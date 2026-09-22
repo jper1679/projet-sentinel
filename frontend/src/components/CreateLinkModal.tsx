@@ -16,6 +16,7 @@ interface CreateLinkModalProps {
 }
 
 const LINK_TYPE_OPTIONS: { value: LinkType; label: string; description: string; color: string }[] = [
+  { value: 'EXECUTE_AVANT', label: 'Doit être exécuté avant ➡️', description: 'Ordre d\'exécution chronologique (vue Gantt)', color: '#8b5cf6' },
   { value: 'LIE_A',        label: 'Lié à',        description: 'Relation neutre d\'association', color: '#3b82f6' },
   { value: 'BLOQUEE_PAR',  label: 'Bloquée par',  description: 'Relation de dépendance / blocage', color: '#ef4444' },
   { value: 'RATTACHE_A',   label: 'Rattaché à',   description: 'Relation hiérarchique (sous-tâche/projet)', color: '#f59e0b' },

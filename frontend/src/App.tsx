@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import LoginView from '@/views/LoginView'
 import MindmapBoard from '@/views/MindmapBoard'
+import NodeDetailView from '@/views/NodeDetailView'
+import GanttView from '@/views/GanttView'
 
 /**
  * Route protégée : redirige vers /login si non authentifié.
@@ -21,6 +23,22 @@ export default function App() {
           element={
             <PrivateRoute>
               <MindmapBoard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/node/:id"
+          element={
+            <PrivateRoute>
+              <NodeDetailView />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/gantt"
+          element={
+            <PrivateRoute>
+              <GanttView />
             </PrivateRoute>
           }
         />

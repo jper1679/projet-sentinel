@@ -1,10 +1,8 @@
-// =============================================================================
-// Projet Sentinel — CustomMindmapNode (React Flow custom node)
-// =============================================================================
-
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { useAppStore, type SentinelNode, type SentinelNodeData } from '@/store/useAppStore'
+import { ExternalLink } from 'lucide-react'
+import { useAppStore, type SentinelNode } from '@/store/useAppStore'
 
 // Couleurs par type de nœud
 const TYPE_COLORS: Record<string, { border: string; bg: string; text: string; dot: string }> = {
@@ -35,18 +33,47 @@ const STATUT_STYLES: Record<string, { bg: string; text: string; label: string }>
   BLOQUE:   { bg: 'rgba(239,68,68,0.2)',   text: '#f87171', label: 'Bloqué 🔒' },
 }
 
+// Couleurs par priorité
+const PRIORITE_STYLES: Record<string, { color: string; label: string }> = {
+  BASSE:    { color: '#64748b', label: 'Basse' },
+  NORMALE:  { color: '#3b82f6', label: 'Normale' },
+  HAUTE:    { color: '#f59e0b', label: 'Haute' },
+  CRITIQUE: { color: '#ef4444', label: 'Critique ⚠️' },
+}
+
 function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
+  const navigate = useNavigate()
   const selectNode = useAppStore((s) => s.selectNode)
+  const DEFAULT_VF = { type: true, statut: true, priorite: true, temps_estime_h: true, cout_estime: true, description: false }
+  const rawVF = useAppStore((s) => s.visibleFields)
+  const visibleFields = rawVF ? { ...DEFAULT_VF, ...rawVF } : DEFAULT_VF
+
+  const [isHovered, setIsHovered] = useState(false)
+
   const colors = TYPE_COLORS[data.type] ?? TYPE_COLORS.IDEE
   const statut = STATUT_STYLES[data.statut] ?? STATUT_STYLES.A_FAIRE
+  const priorite = PRIORITE_STYLES[data.priorite] ?? PRIORITE_STYLES.NORMALE
 
   const handleClick = useCallback(() => {
     selectNode(id)
   }, [id, selectNode])
 
+  const handleOpenFullPage = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      navigate(`/node/${id}`)
+    },
+    [id, navigate],
+  )
+
+  const handleOpacity = isHovered || selected ? 1 : 0
+
   return (
     <div
       onClick={handleClick}
+      onDoubleClick={handleOpenFullPage}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         background: colors.bg,
         border: `1.5px solid ${selected ? '#60a5fa' : colors.border}`,
@@ -54,12 +81,13 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           ? `0 0 0 2px rgba(96,165,250,0.4), 0 8px 32px rgba(0,0,0,0.5)`
           : `0 4px 16px rgba(0,0,0,0.4)`,
         borderRadius: '12px',
-        minWidth: '160px',
-        maxWidth: '240px',
+        minWidth: '170px',
+        maxWidth: '260px',
         padding: '12px 14px',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
         userSelect: 'none',
+        position: 'relative',
       }}
     >
       {/* Handle Entrée (haut) */}
@@ -72,23 +100,55 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           width: 10,
           height: 10,
           top: -6,
+          opacity: handleOpacity,
+          transition: 'opacity 0.15s ease-in-out',
         }}
       />
 
-      {/* En-tête : type + icône */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-        <span style={{ fontSize: '14px' }}>{TYPE_ICONS[data.type]}</span>
-        <span
+      {/* En-tête : type + icône & bouton page Jira */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {visibleFields.type && (
+            <>
+              <span style={{ fontSize: '14px' }}>{TYPE_ICONS[data.type]}</span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: colors.text,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {data.type}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Bouton ouvrir en page Jira au survol/sélection */}
+        <button
+          onClick={handleOpenFullPage}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Ouvrir la fiche complète (style Jira)"
           style={{
+            opacity: isHovered || selected ? 1 : 0,
+            transition: 'opacity 0.15s ease-in-out',
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '6px',
+            padding: '3px 5px',
+            color: '#94a3b8',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
             fontSize: '10px',
-            fontWeight: 600,
-            color: colors.text,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
           }}
+          className="nodrag nopan hover:text-white hover:bg-blue-600/40 transition-colors"
         >
-          {data.type}
-        </span>
+          <ExternalLink size={11} />
+        </button>
       </div>
 
       {/* Titre */}
@@ -98,39 +158,82 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           fontWeight: 600,
           color: '#e2e8f0',
           lineHeight: 1.3,
-          marginBottom: '8px',
+          marginBottom: visibleFields.description && data.description ? '4px' : '8px',
           wordBreak: 'break-word',
         }}
       >
         {data.titre}
       </div>
 
-      {/* Pied : statut + estimations */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-        {/* Badge statut */}
-        <span
+      {/* Extrait de description (si configuré) */}
+      {visibleFields.description && data.description && (
+        <div
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            padding: '2px 7px',
-            borderRadius: '99px',
-            background: statut.bg,
-            color: statut.text,
-            fontSize: '10px',
-            fontWeight: 600,
+            fontSize: '11px',
+            color: '#94a3b8',
+            lineHeight: 1.3,
+            marginBottom: '8px',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
           }}
         >
-          {statut.label}
-        </span>
+          {data.description}
+        </div>
+      )}
 
-        {/* Estimations */}
-        {(data.temps_estime_h != null || data.cout_estime != null) && (
-          <div style={{ display: 'flex', gap: '6px', fontSize: '10px', color: '#64748b' }}>
-            {data.temps_estime_h != null && <span>⏱ {data.temps_estime_h}h</span>}
-            {data.cout_estime != null && <span>💲{data.cout_estime}</span>}
-          </div>
-        )}
-      </div>
+      {/* Badge priorité (si configuré) */}
+      {visibleFields.priorite && data.priorite && (
+        <div style={{ marginBottom: '6px' }}>
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 600,
+              color: priorite.color,
+              background: `${priorite.color}18`,
+              border: `1px solid ${priorite.color}40`,
+              padding: '1px 6px',
+              borderRadius: '4px',
+              textTransform: 'uppercase',
+            }}
+          >
+            Prio: {priorite.label}
+          </span>
+        </div>
+      )}
+
+      {/* Pied : statut + estimations */}
+      {(visibleFields.statut || visibleFields.temps_estime_h || visibleFields.cout_estime) && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          {/* Badge statut */}
+          {visibleFields.statut && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 7px',
+                borderRadius: '99px',
+                background: statut.bg,
+                color: statut.text,
+                fontSize: '10px',
+                fontWeight: 600,
+              }}
+            >
+              {statut.label}
+            </span>
+          )}
+
+          {/* Estimations */}
+          {((visibleFields.temps_estime_h && data.temps_estime_h != null) ||
+            (visibleFields.cout_estime && data.cout_estime != null)) && (
+            <div style={{ display: 'flex', gap: '6px', fontSize: '10px', color: '#64748b', marginLeft: 'auto' }}>
+              {visibleFields.temps_estime_h && data.temps_estime_h != null && <span>⏱ {data.temps_estime_h}h</span>}
+              {visibleFields.cout_estime && data.cout_estime != null && <span>💲{data.cout_estime}</span>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Handle Sortie (bas) */}
       <Handle
@@ -142,6 +245,8 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           width: 10,
           height: 10,
           bottom: -6,
+          opacity: handleOpacity,
+          transition: 'opacity 0.15s ease-in-out',
         }}
       />
 
@@ -156,6 +261,8 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           width: 8,
           height: 8,
           right: -5,
+          opacity: handleOpacity,
+          transition: 'opacity 0.15s ease-in-out',
         }}
       />
       <Handle
@@ -168,6 +275,8 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
           width: 8,
           height: 8,
           left: -5,
+          opacity: handleOpacity,
+          transition: 'opacity 0.15s ease-in-out',
         }}
       />
     </div>
@@ -175,3 +284,4 @@ function CustomMindmapNode({ id, data, selected }: NodeProps<SentinelNode>) {
 }
 
 export default memo(CustomMindmapNode)
+

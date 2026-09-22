@@ -35,6 +35,15 @@ export interface SentinelNodeData extends Record<string, unknown> {
   updated_at: string
 }
 
+export interface NodeVisibleFields {
+  type: boolean
+  statut: boolean
+  priorite: boolean
+  temps_estime_h: boolean
+  cout_estime: boolean
+  description: boolean
+}
+
 export type SentinelNode = Node<SentinelNodeData>
 export type SentinelEdge = Edge<{ type: string; created_at: string }>
 
@@ -55,6 +64,7 @@ interface AppState {
   selectedNodeId: string | null
   isDrawerOpen: boolean
   isLoading: boolean
+  visibleFields: NodeVisibleFields
 
   // Actions Auth
   setToken: (token: string, user: SentinelUser) => void
@@ -74,11 +84,22 @@ interface AppState {
   selectNode: (id: string | null) => void
   setDrawerOpen: (open: boolean) => void
   setLoading: (loading: boolean) => void
+  toggleVisibleField: (field: keyof NodeVisibleFields) => void
+  setVisibleFields: (fields: Partial<NodeVisibleFields>) => void
 }
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
+
+const DEFAULT_VISIBLE_FIELDS: NodeVisibleFields = {
+  type: true,
+  statut: true,
+  priorite: true,
+  temps_estime_h: true,
+  cout_estime: true,
+  description: false,
+}
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -91,6 +112,7 @@ export const useAppStore = create<AppState>()(
       selectedNodeId: null,
       isDrawerOpen: false,
       isLoading: false,
+      visibleFields: DEFAULT_VISIBLE_FIELDS,
 
       // Auth
       setToken: (token, user) => set({ token, user }),
@@ -143,12 +165,47 @@ export const useAppStore = create<AppState>()(
         })),
 
       setLoading: (loading) => set({ isLoading: loading }),
+
+      toggleVisibleField: (field) =>
+        set((state) => {
+          const current = state.visibleFields
+            ? { ...DEFAULT_VISIBLE_FIELDS, ...state.visibleFields }
+            : DEFAULT_VISIBLE_FIELDS
+          return {
+            visibleFields: {
+              ...current,
+              [field]: !current[field],
+            },
+          }
+        }),
+
+      setVisibleFields: (fields) =>
+        set((state) => ({
+          visibleFields: {
+            ...DEFAULT_VISIBLE_FIELDS,
+            ...(state.visibleFields || {}),
+            ...fields,
+          },
+        })),
     }),
     {
       name: 'sentinel-auth',
       storage: createJSONStorage(() => localStorage),
-      // Ne persiste que le token et l'user — pas le graphe (chargé depuis l'API)
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      // Persiste le token, l'user et les préférences de visibilité des champs
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        visibleFields: state.visibleFields,
+      }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(persistedState as object),
+        visibleFields: {
+          ...DEFAULT_VISIBLE_FIELDS,
+          ...((persistedState as any)?.visibleFields || {}),
+        },
+      }),
     },
   ),
 )
+

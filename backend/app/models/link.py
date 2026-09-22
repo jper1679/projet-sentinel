@@ -8,9 +8,12 @@ from pydantic import BaseModel, Field
 
 
 class LinkType(StrEnum):
+    EXECUTE_AVANT = "EXECUTE_AVANT"
     BLOQUEE_PAR = "BLOQUEE_PAR"
     RATTACHE_A = "RATTACHE_A"
     ASSIGNE_A = "ASSIGNE_A"
+    SUIVIE_DE = "SUIVIE_DE"
+    CONTIENT_ETAPE = "CONTIENT_ETAPE"
     LIE_A = "LIE_A"
 
 
