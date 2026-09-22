@@ -45,6 +45,30 @@ def _row_to_node(row: dict) -> NodeOut:
 
     now = datetime.now(timezone.utc).isoformat()
 
+    raw_pos_x = n.get("pos_x")
+    raw_pos_y = n.get("pos_y")
+    try:
+        pos_x = float(raw_pos_x) if raw_pos_x is not None else 0.0
+    except (ValueError, TypeError):
+        pos_x = 0.0
+
+    try:
+        pos_y = float(raw_pos_y) if raw_pos_y is not None else 0.0
+    except (ValueError, TypeError):
+        pos_y = 0.0
+
+    raw_temps = n.get("temps_estime_h")
+    raw_cout = n.get("cout_estime")
+    try:
+        temps_estime_h = float(raw_temps) if raw_temps is not None else None
+    except (ValueError, TypeError):
+        temps_estime_h = None
+
+    try:
+        cout_estime = float(raw_cout) if raw_cout is not None else None
+    except (ValueError, TypeError):
+        cout_estime = None
+
     return NodeOut(
         id=str(n.get("id") or uuid.uuid4()),
         titre=str(n.get("titre") or "Sans titre"),
@@ -52,10 +76,10 @@ def _row_to_node(row: dict) -> NodeOut:
         type=node_type,
         statut=node_statut,
         priorite=node_prio,
-        temps_estime_h=float(n["temps_estime_h"]) if n.get("temps_estime_h") is not None else None,
-        cout_estime=float(n["cout_estime"]) if n.get("cout_estime") is not None else None,
-        pos_x=float(n.get("pos_x", 0.0)),
-        pos_y=float(n.get("pos_y", 0.0)),
+        temps_estime_h=temps_estime_h,
+        cout_estime=cout_estime,
+        pos_x=pos_x,
+        pos_y=pos_y,
         created_at=str(n.get("created_at") or now),
         updated_at=str(n.get("updated_at") or now),
     )
@@ -273,41 +297,42 @@ async def import_xmind(
     for l in links_data:
         l["created_at"] = now
 
-    # Bulk create nodes in Neo4j
-    res_nodes = await session.run(
-        """
-        UNWIND $nodes AS row
-        MERGE (i:Item {id: row.id})
-        SET i.titre = row.titre,
-            i.description = row.description,
-            i.type = row.type,
-            i.statut = row.statut,
-            i.priorite = row.priorite,
-            i.pos_x = row.pos_x,
-            i.pos_y = row.pos_y,
-            i.created_at = row.created_at,
-            i.updated_at = row.updated_at
-        RETURN count(i) AS cnt
-        """,
-        {"nodes": nodes_data},
-    )
-    await res_nodes.consume()
-
-    # Bulk create links in Neo4j
-    if links_data:
-        res_links = await session.run(
+    async def _write_xmind_data(tx):
+        res_n = await tx.run(
             """
-            UNWIND $links AS row
-            MATCH (a:Item {id: row.source_id})
-            MATCH (b:Item {id: row.target_id})
-            MERGE (a)-[r:REL {id: row.id}]->(b)
-            SET r.type = row.type,
-                r.created_at = row.created_at
-            RETURN count(r) AS cnt
+            UNWIND $nodes AS row
+            MERGE (i:Item {id: row.id})
+            SET i.titre = row.titre,
+                i.description = row.description,
+                i.type = row.type,
+                i.statut = row.statut,
+                i.priorite = row.priorite,
+                i.pos_x = row.pos_x,
+                i.pos_y = row.pos_y,
+                i.created_at = row.created_at,
+                i.updated_at = row.updated_at
+            RETURN count(i) AS cnt
             """,
-            {"links": links_data},
+            {"nodes": nodes_data},
         )
-        await res_links.consume()
+        await res_n.consume()
+
+        if links_data:
+            res_l = await tx.run(
+                """
+                UNWIND $links AS row
+                MATCH (a:Item {id: row.source_id})
+                MATCH (b:Item {id: row.target_id})
+                MERGE (a)-[r:REL {id: row.id}]->(b)
+                SET r.type = row.type,
+                    r.created_at = row.created_at
+                RETURN count(r) AS cnt
+                """,
+                {"links": links_data},
+            )
+            await res_l.consume()
+
+    await session.execute_write(_write_xmind_data)
 
     return {
         "status": "success",
