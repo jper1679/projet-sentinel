@@ -406,10 +406,14 @@ function MindmapBoardContent() {
         onClose={() => setIsImportXMindOpen(false)}
         onSuccess={async () => {
           await loadGraph()
-          setTimeout(() => fitView({ duration: 500, padding: 0.2 }), 100)
+          setTimeout(() => fitView({ duration: 500, padding: 0.2 }), 150)
         }}
-        onTriggerAutoLayout={() => {
-          handleAutoLayout('LR')
+        onTriggerAutoLayout={async () => {
+          await loadGraph()
+          setTimeout(() => {
+            handleAutoLayout('LR')
+            setTimeout(() => fitView({ duration: 500, padding: 0.2 }), 150)
+          }, 100)
         }}
       />
 

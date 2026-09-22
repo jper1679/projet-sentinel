@@ -211,10 +211,11 @@ export default function ImportXMindModal({
                   <button
                     type="button"
                     onClick={() => {
+                      onSuccess()
                       onTriggerAutoLayout()
                       onClose()
                     }}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-600/20"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-600/20 cursor-pointer"
                   >
                     <LayoutGrid size={15} />
                     Réorganiser le canevas (Auto-Layout) 🪄
